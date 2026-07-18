@@ -30,6 +30,7 @@ export default async function PostPage({ params, searchParams }: { params: Promi
   const pending = firstParam(rawParams.pending) || "0";
   const noData = firstParam(rawParams.noData) || "0";
   const failed = firstParam(rawParams.failed) || "0";
+  const outcomeErrors = (firstParam(rawParams.errors) || "").split(" | ").filter(Boolean);
   if (!post) notFound();
   const outcomes = (await listOutcomeEvaluations()).filter((outcome) => outcome.post_id === post.id);
 
@@ -68,9 +69,10 @@ export default async function PostPage({ params, searchParams }: { params: Promi
             <p className="mt-4 rounded border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">Uppföljning kunde inte köras. Fel: {outcomeMessage || "Okänt fel"}</p>
           ) : null}
           {outcomeStatus ? (
-            <p className="mt-4 rounded border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-950">
-              Uppföljning klar: kontrollerade {checked}, uppdaterade {updated}, väntar {pending}, ingen data {noData}, misslyckade {failed}.
-            </p>
+            <div className={`mt-4 rounded border p-3 text-sm ${Number(failed) > 0 ? "border-amber-200 bg-amber-50 text-amber-950" : "border-emerald-200 bg-emerald-50 text-emerald-950"}`}>
+              <p>Uppföljning klar: kontrollerade {checked}, uppdaterade {updated}, väntar {pending}, ingen data {noData}, misslyckade {failed}.</p>
+              {outcomeErrors.length ? <p className="mt-2 font-medium">Felorsak: {outcomeErrors.join(" / ")}</p> : null}
+            </div>
           ) : null}
           {(post.mentions || []).some((mention) => (mention.signals || []).length > 0) ? (
             <div className="mt-4"><OutcomeUpdateForm postId={post.id} /></div>

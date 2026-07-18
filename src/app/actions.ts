@@ -30,6 +30,11 @@ function outcomeReportUrl(postId: string | undefined, report: Awaited<ReturnType
     noData: String(report.noData),
     failed: String(report.failed),
   });
+  const errors = report.errors
+    .slice(0, 3)
+    .map((error) => (error.length > 220 ? `${error.slice(0, 220)}...` : error))
+    .join(" | ");
+  if (errors) params.set("errors", errors);
 
   return postId ? `/posts/${postId}?${params}` : `/?tab=outcomes&${params}`;
 }

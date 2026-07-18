@@ -36,10 +36,15 @@ function OutcomeResultPanel({ params }: { params: Record<string, string> }) {
   const noData = Number(params.noData || 0);
   const failed = Number(params.failed || 0);
   const empty = checked === 0;
+  const errors = (params.errors || "").split(" | ").filter(Boolean);
+  const hasFailures = failed > 0;
 
   return (
-    <section className="rounded border border-emerald-200 bg-emerald-50 p-4 text-sm leading-6 text-emerald-950">
-      {empty ? "Inga uppföljningsbara signaler hittades. Det krävs en sparad analys med ticker. Manuella videos utan publiceringsdatum använder nu skapandedatum som fallback." : `Uppföljning klar: kontrollerade ${checked}, uppdaterade ${updated}, väntar ${pending}, ingen data ${noData}, misslyckade ${failed}.`}
+    <section className={`rounded border p-4 text-sm leading-6 ${hasFailures ? "border-amber-200 bg-amber-50 text-amber-950" : "border-emerald-200 bg-emerald-50 text-emerald-950"}`}>
+      <p>
+        {empty ? "Inga uppföljningsbara signaler hittades. Det krävs en sparad analys med ticker. Manuella videos utan publiceringsdatum använder nu skapandedatum som fallback." : `Uppföljning klar: kontrollerade ${checked}, uppdaterade ${updated}, väntar ${pending}, ingen data ${noData}, misslyckade ${failed}.`}
+      </p>
+      {errors.length ? <p className="mt-2 font-medium">Felorsak: {errors.join(" / ")}</p> : null}
     </section>
   );
 }
