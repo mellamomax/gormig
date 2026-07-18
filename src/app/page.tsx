@@ -29,6 +29,21 @@ function OutcomeErrorPanel({ message }: { message: string }) {
   );
 }
 
+function OutcomeResultPanel({ params }: { params: Record<string, string> }) {
+  const checked = Number(params.checked || 0);
+  const updated = Number(params.updated || 0);
+  const pending = Number(params.pending || 0);
+  const noData = Number(params.noData || 0);
+  const failed = Number(params.failed || 0);
+  const empty = checked === 0;
+
+  return (
+    <section className="rounded border border-emerald-200 bg-emerald-50 p-4 text-sm leading-6 text-emerald-950">
+      {empty ? "Inga uppföljningsbara signaler hittades. Det krävs en sparad analys med ticker. Manuella videos utan publiceringsdatum använder nu skapandedatum som fallback." : `Uppföljning klar: kontrollerade ${checked}, uppdaterade ${updated}, väntar ${pending}, ingen data ${noData}, misslyckade ${failed}.`}
+    </section>
+  );
+}
+
 function SetupPanel() {
   return (
     <section className="rounded border border-amber-200 bg-amber-50 p-4 text-amber-950">
@@ -78,6 +93,7 @@ export default async function Home({ searchParams }: { searchParams?: Promise<Re
       <div className="mx-auto grid max-w-7xl gap-4 px-5 py-4">
         {!hasDb ? <SetupPanel /> : null}
         {params.outcomeError ? <OutcomeErrorPanel message={params.outcomeMessage || "Okänt fel"} /> : null}
+        {params.outcomeStatus ? <OutcomeResultPanel params={params} /> : null}
         <DashboardTabs active={activeTab} />
 
         {activeTab === "overview" ? (

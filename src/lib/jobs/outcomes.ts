@@ -1,4 +1,4 @@
-﻿import { listSignalsForOutcomeUpdate, upsertOutcomeEvaluation, writeRunLog } from "@/lib/data";
+import { listSignalsForOutcomeUpdate, upsertOutcomeEvaluation, writeRunLog } from "@/lib/data";
 import { getErrorMessage } from "@/lib/errors";
 import { fetchDailyPrices, findPriceOnOrAfter, hasMarketDataConfig } from "@/lib/market/alpha-vantage";
 import { addDays, inferHorizonDays, toDateOnly } from "@/lib/market/horizon";
@@ -63,10 +63,13 @@ export async function updateOutcomeEvaluations(postId?: string) {
     try {
       const mention = signal.mentions;
       const post = mention?.posts;
-      if (!mention?.ticker || !post?.published_at) continue;
+      const sourceDate = post?.published_at || post?.created_at;
+      if (!mention?.ticker || !sourceDate || !post) continue;
 
+      const usedCreatedDate = !post.published_at;
+      const dateNote = usedCreatedDate ? " Skapandedatum användes eftersom publiceringsdatum saknas." : "";
       const horizonDays = inferHorizonDays(mention.time_horizon);
-      const startDate = new Date(post.published_at);
+      const startDate = new Date(sourceDate);
       const targetDate = addDays(startDate, horizonDays);
       const startDateOnly = toDateOnly(startDate);
       const targetDateOnly = toDateOnly(targetDate);
@@ -90,9 +93,9 @@ export async function updateOutcomeEvaluations(postId?: string) {
           return_pct: null,
           is_success: null,
           verdict: "PENDING",
-          notes: `Uppföljningsdatumet ${targetDateOnly} har inte passerat ännu.`,
+          notes: `Uppföljningsdatumet ${targetDateOnly} har inte passerat ännu.${dateNote}`,
           source: "alpha_vantage",
-          raw_data: { symbol },
+          raw_data: { symbol, usedCreatedDate },
         });
         report.pending += 1;
         continue;
@@ -120,9 +123,9 @@ export async function updateOutcomeEvaluations(postId?: string) {
           return_pct: null,
           is_success: null,
           verdict: "NO_DATA",
-          notes: "Kunde inte hitta start- eller målpris i marknadsdatat.",
+          notes: `Kunde inte hitta start- eller målpris i marknadsdatat.${dateNote}`,
           source: "alpha_vantage",
-          raw_data: { symbol, availablePrices: prices.length },
+          raw_data: { symbol, availablePrices: prices.length, usedCreatedDate },
         });
         report.noData += 1;
         continue;
@@ -147,9 +150,9 @@ export async function updateOutcomeEvaluations(postId?: string) {
         return_pct: returnPct,
         is_success: classified.isSuccess,
         verdict: classified.verdict,
-        notes: `Kursrörelse ${returnPct.toFixed(2)}% från ${start.date} till ${end.date}.`,
+        notes: `Kursrörelse ${returnPct.toFixed(2)}% från ${start.date} till ${end.date}.${dateNote}`,
         source: "alpha_vantage",
-        raw_data: { symbol },
+        raw_data: { symbol, usedCreatedDate },
       });
       report.updated += 1;
     } catch (error) {

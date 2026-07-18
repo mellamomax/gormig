@@ -329,7 +329,7 @@ export async function listSignalsForOutcomeUpdate(postId?: string) {
   return rows.filter((signal) => {
     if (postId && signal.mentions?.post_id !== postId) return false;
     if (signal.action === "INSUFFICIENT_DATA") return false;
-    return Boolean(signal.mentions?.ticker && signal.mentions?.posts?.published_at);
+    return Boolean(signal.mentions?.ticker && (signal.mentions?.posts?.published_at || signal.mentions?.posts?.created_at));
   });
 }
 

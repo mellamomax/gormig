@@ -13,13 +13,23 @@ function formatDate(value: string | null) {
   return new Intl.DateTimeFormat("sv-SE", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
 }
 
+function firstParam(value: string | string[] | undefined) {
+  return Array.isArray(value) ? value[0] : value;
+}
+
 export default async function PostPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams?: Promise<Record<string, string | string[] | undefined>> }) {
   if (!canUseDatabase()) notFound();
   const { id } = await params;
   const post = await getPostWithAnalysis(id);
   const rawParams = searchParams ? await searchParams : {};
-  const outcomeError = Array.isArray(rawParams.outcomeError) ? rawParams.outcomeError[0] : rawParams.outcomeError;
-  const outcomeMessage = Array.isArray(rawParams.outcomeMessage) ? rawParams.outcomeMessage[0] : rawParams.outcomeMessage;
+  const outcomeError = firstParam(rawParams.outcomeError);
+  const outcomeMessage = firstParam(rawParams.outcomeMessage);
+  const outcomeStatus = firstParam(rawParams.outcomeStatus);
+  const checked = firstParam(rawParams.checked) || "0";
+  const updated = firstParam(rawParams.updated) || "0";
+  const pending = firstParam(rawParams.pending) || "0";
+  const noData = firstParam(rawParams.noData) || "0";
+  const failed = firstParam(rawParams.failed) || "0";
   if (!post) notFound();
   const outcomes = (await listOutcomeEvaluations()).filter((outcome) => outcome.post_id === post.id);
 
@@ -56,6 +66,11 @@ export default async function PostPage({ params, searchParams }: { params: Promi
           </div>
           {outcomeError ? (
             <p className="mt-4 rounded border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">Uppföljning kunde inte köras. Fel: {outcomeMessage || "Okänt fel"}</p>
+          ) : null}
+          {outcomeStatus ? (
+            <p className="mt-4 rounded border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-950">
+              Uppföljning klar: kontrollerade {checked}, uppdaterade {updated}, väntar {pending}, ingen data {noData}, misslyckade {failed}.
+            </p>
           ) : null}
           {(post.mentions || []).some((mention) => (mention.signals || []).length > 0) ? (
             <div className="mt-4"><OutcomeUpdateForm postId={post.id} /></div>

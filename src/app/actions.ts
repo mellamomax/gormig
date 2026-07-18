@@ -21,6 +21,19 @@ function outcomeErrorUrl(postId: string | undefined, error: unknown) {
     : `/?tab=outcomes&outcomeError=1&outcomeMessage=${message}`;
 }
 
+function outcomeReportUrl(postId: string | undefined, report: Awaited<ReturnType<typeof updateOutcomeEvaluations>>) {
+  const params = new URLSearchParams({
+    outcomeStatus: "1",
+    checked: String(report.checked),
+    updated: String(report.updated),
+    pending: String(report.pending),
+    noData: String(report.noData),
+    failed: String(report.failed),
+  });
+
+  return postId ? `/posts/${postId}?${params}` : `/?tab=outcomes&${params}`;
+}
+
 export async function addManualTranscriptAction(formData: FormData) {
   const transcript = getString(formData, "transcript");
   if (!transcript) throw new Error("Transkription saknas.");
@@ -66,12 +79,17 @@ export async function scrapePostsAction(formData: FormData) {
 
 export async function updateOutcomesAction(formData: FormData) {
   const postId = getString(formData, "postId") || undefined;
+  let report: Awaited<ReturnType<typeof updateOutcomeEvaluations>>;
+
   try {
-    await updateOutcomeEvaluations(postId);
+    report = await updateOutcomeEvaluations(postId);
     revalidatePath("/");
     if (postId) revalidatePath(`/posts/${postId}`);
   } catch (error) {
     console.error("Outcome update failed", { postId, message: getErrorMessage(error) });
     redirect(outcomeErrorUrl(postId, error));
   }
+
+  console.info("Outcome update completed", { postId, report });
+  redirect(outcomeReportUrl(postId, report));
 }
