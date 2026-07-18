@@ -70,11 +70,11 @@ export async function processPost(postId: string, explainLevel: ExplainLevel = D
     const analysis = await analyzeTranscript(transcript, explainLevel);
     await replacePostAnalysis(postId, analysis);
     const report = { postId, explainLevel, transcribed, analyzed: true, mentions: analysis.mentions.length };
-    await writeRunLog("manual_process", "completed", report);
+    await writeRunLog("manual_analysis", "completed", report);
     return report;
   } catch (error) {
     await setPostStatus(postId, "failed", getErrorMessage(error));
-    await writeRunLog("manual_process", "failed", { postId, error: getErrorMessage(error) });
+    await writeRunLog("manual_analysis", "failed", { postId, error: getErrorMessage(error) });
     throw error;
   }
 }
