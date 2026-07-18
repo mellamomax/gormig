@@ -1,0 +1,102 @@
+﻿import Link from "next/link";
+import { notFound } from "next/navigation";
+import { ArrowLeft, ExternalLink } from "lucide-react";
+import { analyzePostAction, transcribePostAction } from "@/app/actions";
+import { RiskBadge, SignalBadge, StatusBadge } from "@/components/badges";
+import { canUseDatabase, getPostWithAnalysis } from "@/lib/data";
+
+function formatDate(value: string | null) {
+  if (!value) return "Datum saknas";
+  return new Intl.DateTimeFormat("sv-SE", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
+}
+
+export default async function PostPage({ params }: { params: Promise<{ id: string }> }) {
+  if (!canUseDatabase()) notFound();
+  const { id } = await params;
+  const post = await getPostWithAnalysis(id);
+  if (!post) notFound();
+
+  return (
+    <main className="min-h-screen bg-[var(--background)]">
+      <div className="mx-auto grid max-w-5xl gap-5 px-5 py-6">
+        <Link className="inline-flex w-fit items-center gap-2 text-sm font-medium text-slate-600" href="/">
+          <ArrowLeft size={16} /> Till dashboard
+        </Link>
+
+        <section className="rounded border border-[var(--line)] bg-[var(--panel)] p-5">
+          <div className="flex flex-wrap items-center gap-2">
+            <StatusBadge status={post.processing_status} />
+            <span className="text-sm text-slate-500">{formatDate(post.published_at)}</span>
+          </div>
+          <h1 className="mt-3 text-2xl font-bold">{post.caption || "Video utan caption"}</h1>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <Link className="inline-flex items-center gap-2 rounded border border-[var(--line)] px-3 py-2 text-sm font-medium" href={post.url} target="_blank">
+              <ExternalLink size={15} /> Öppna TikTok
+            </Link>
+            {post.media_url && !post.transcript ? (
+              <form action={transcribePostAction}>
+                <input type="hidden" name="postId" value={post.id} />
+                <button className="rounded bg-[var(--accent)] px-3 py-2 text-sm font-semibold text-white" type="submit">Transkribera</button>
+              </form>
+            ) : null}
+            {post.transcript ? (
+              <form action={analyzePostAction}>
+                <input type="hidden" name="postId" value={post.id} />
+                <button className="rounded bg-[var(--foreground)] px-3 py-2 text-sm font-semibold text-white" type="submit">Analysera igen</button>
+              </form>
+            ) : null}
+          </div>
+          {post.processing_error ? <p className="mt-4 rounded border border-red-200 bg-red-50 p-3 text-sm text-red-900">{post.processing_error}</p> : null}
+        </section>
+
+        <section className="rounded border border-[var(--line)] bg-[var(--panel)] p-5">
+          <h2 className="text-lg font-semibold">Transkription</h2>
+          <p className="mt-3 whitespace-pre-wrap text-sm leading-7 text-slate-700">{post.transcript || "Ingen transkription ännu."}</p>
+        </section>
+
+        <section className="grid gap-3">
+          <h2 className="text-lg font-semibold">Analys</h2>
+          {(post.mentions || []).length === 0 ? <p className="rounded border border-dashed border-[var(--line)] bg-[var(--panel)] p-5 text-sm text-slate-600">Ingen analys sparad ännu.</p> : null}
+          {(post.mentions || []).map((mention) => {
+            const signal = mention.signals?.[0];
+            return (
+              <article key={mention.id} className="rounded border border-[var(--line)] bg-[var(--panel)] p-5">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <Link className="text-xl font-semibold hover:text-[var(--accent)]" href={`/stocks/${encodeURIComponent(mention.ticker || mention.company_name)}`}>
+                      {mention.company_name} {mention.ticker ? <span className="text-slate-500">({mention.ticker})</span> : null}
+                    </Link>
+                    <p className="mt-1 text-sm text-slate-500">{mention.exchange || "Börs saknas"} · sentiment {mention.sentiment} · confidence {Math.round(mention.confidence * 100)}%</p>
+                  </div>
+                  <div className="grid justify-items-start gap-1 sm:justify-items-end">
+                    <SignalBadge signal={signal} />
+                    <RiskBadge risk={signal?.risk_level} />
+                  </div>
+                </div>
+                <p className="mt-4 text-sm leading-6 text-slate-700">{mention.thesis}</p>
+                <div className="mt-4 grid gap-4 md:grid-cols-3">
+                  <List title="Argument" items={mention.arguments} />
+                  <List title="Risker" items={mention.risks} />
+                  <List title="Katalysatorer" items={mention.catalysts} />
+                </div>
+                {signal ? <p className="mt-4 rounded bg-[var(--panel-2)] p-3 text-sm leading-6 text-slate-700">{signal.reasoning}</p> : null}
+              </article>
+            );
+          })}
+        </section>
+      </div>
+    </main>
+  );
+}
+
+function List({ title, items }: { title: string; items: string[] }) {
+  return (
+    <div>
+      <h3 className="text-sm font-semibold">{title}</h3>
+      {items.length === 0 ? <p className="mt-2 text-sm text-slate-500">Saknas</p> : null}
+      <ul className="mt-2 grid gap-2 text-sm leading-6 text-slate-700">
+        {items.map((item) => <li key={item}>• {item}</li>)}
+      </ul>
+    </div>
+  );
+}
