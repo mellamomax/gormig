@@ -69,6 +69,35 @@ export type OutcomeEvaluation = {
 };
 
 export type SignalAction = "BUY_CANDIDATE" | "WATCH" | "HOLD" | "REDUCE" | "AVOID" | "INSUFFICIENT_DATA";
+export type PaperTradingSettings = {
+  id: boolean;
+  enabled: boolean;
+  starting_cash: number;
+  allocation_per_trade: number;
+  activated_at: string | null;
+  updated_at: string;
+};
+
+export type PaperTrade = {
+  id: string;
+  signal_id: string;
+  mention_id: string;
+  post_id: string;
+  ticker: string;
+  company_name: string;
+  action: SignalAction;
+  status: "planned" | "settled" | "ignored";
+  allocated_cash: number;
+  horizon_label: string | null;
+  horizon_days: number | null;
+  planned_entry_at: string;
+  planned_exit_date: string | null;
+  thesis: string | null;
+  expectation: string | null;
+  risk_level: string | null;
+  created_at: string;
+  updated_at: string;
+};
 
 export type Signal = {
   id: string;

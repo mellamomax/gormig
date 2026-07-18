@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { createManualTranscriptPost } from "@/lib/data";
+import { createManualTranscriptPost, setPaperTradingEnabled } from "@/lib/data";
 import { parseExplainLevel } from "@/lib/explain-level";
 import { getErrorMessage } from "@/lib/errors";
 import { analyzePost, scrapeLatestPosts, transcribePost } from "@/lib/jobs/manual-runs";
@@ -98,4 +98,10 @@ export async function updateOutcomesAction(formData: FormData) {
 
   console.info("Outcome update completed", { postId, report });
   redirect(outcomeReportUrl(postId, report));
+}
+export async function togglePaperTradingAction(formData: FormData) {
+  const enabled = getString(formData, "enabled") === "yes";
+  await setPaperTradingEnabled(enabled);
+  revalidatePath("/");
+  redirect("/?tab=paper");
 }

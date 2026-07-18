@@ -31,6 +31,19 @@ function verdictLabel(verdict: string) {
   return labels[verdict] || verdict;
 }
 
+function expectationText(company: string, action?: string) {
+  if (action === "BUY_CANDIDATE") return `${company} förväntas gå upp`;
+  if (action === "WATCH") return `${company} ska bevakas`;
+  if (action === "HOLD") return `${company} väntas hålla sig stabil`;
+  if (action === "REDUCE") return `${company} förväntas vara svagare`;
+  if (action === "AVOID") return `${company} bedöms som för riskfylld`;
+  return "Ingen tydlig förväntan";
+}
+
+function horizonText(value: string | null) {
+  return value || "Oklar - följs inte automatiskt";
+}
+
 export default async function PostPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams?: Promise<Record<string, string | string[] | undefined>> }) {
   if (!canUseDatabase()) notFound();
   const { id } = await params;
@@ -118,19 +131,32 @@ export default async function PostPage({ params, searchParams }: { params: Promi
                     <RiskBadge risk={signal?.risk_level} />
                   </div>
                 </div>
-                <p className="mt-4 text-sm leading-6 text-slate-700">{mention.thesis}</p>
-                <div className="mt-4 grid gap-4 md:grid-cols-3">
-                  <List title="Argument" items={mention.arguments} />
-                  <List title="Risker" items={mention.risks} />
-                  <List title="Katalysatorer" items={mention.catalysts} />
+                <div className="mt-4 grid gap-3 md:grid-cols-2">
+                  <div className="rounded border border-[var(--line)] bg-[var(--panel-2)] p-3">
+                    <div className="text-xs font-semibold uppercase text-slate-500">Förväntan</div>
+                    <div className="mt-1 text-lg font-semibold">{expectationText(mention.company_name, signal?.action)}</div>
+                  </div>
+                  <div className="rounded border border-[var(--line)] bg-[var(--panel-2)] p-3">
+                    <div className="text-xs font-semibold uppercase text-slate-500">Tidshorisont</div>
+                    <div className="mt-1 text-lg font-semibold">{horizonText(mention.time_horizon)}</div>
+                  </div>
                 </div>
-                {signal ? <p className="mt-4 rounded bg-[var(--panel-2)] p-3 text-sm leading-6 text-slate-700">{signal.reasoning}</p> : null}
+                <p className="mt-4 text-sm leading-6 text-slate-700">{mention.thesis}</p>
+                {signal ? <p className="mt-3 rounded bg-[var(--panel-2)] p-3 text-sm leading-6 text-slate-700">{signal.reasoning}</p> : null}
                 {outcome ? (
                   <div className="mt-3 rounded border border-[var(--line)] p-3 text-sm text-slate-700">
                     <div className="font-semibold">Uppföljning: {verdictLabel(outcome.verdict)}</div>
                     <div className="mt-1">{outcome.notes}</div>
                   </div>
                 ) : null}
+                <details className="mt-4 rounded border border-[var(--line)] p-3">
+                  <summary className="cursor-pointer text-sm font-semibold">Visa underlag</summary>
+                  <div className="mt-4 grid gap-4 md:grid-cols-3">
+                    <List title="Argument" items={mention.arguments} />
+                    <List title="Risker" items={mention.risks} />
+                    <List title="Katalysatorer" items={mention.catalysts} />
+                  </div>
+                </details>
               </article>
             );
           })}

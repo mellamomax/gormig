@@ -6,6 +6,7 @@ const tabs = [
   { id: "manual", label: "Testa manuellt" },
   { id: "scrape", label: "Scrape" },
   { id: "outcomes", label: "Uppföljning" },
+  { id: "paper", label: "Paper" },
 ];
 
 export function DashboardTabs({ active }: { active: string }) {

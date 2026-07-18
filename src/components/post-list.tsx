@@ -22,8 +22,8 @@ export function PostList({ posts }: { posts: DashboardPost[] }) {
   }
 
   return (
-    <section className="overflow-hidden rounded border border-[var(--line)] bg-[var(--panel)]">
-      <div className="grid grid-cols-[6rem_8rem_minmax(12rem,1.2fr)_5rem_8rem_minmax(13rem,1fr)] gap-3 border-b border-[var(--line)] bg-[var(--panel-2)] px-3 py-2 text-xs font-semibold uppercase text-slate-500">
+    <section className="overflow-x-auto rounded border border-[var(--line)] bg-[var(--panel)]">
+      <div className="grid min-w-[58rem] grid-cols-[6rem_8rem_minmax(12rem,1.2fr)_5rem_8rem_minmax(13rem,1fr)] gap-3 border-b border-[var(--line)] bg-[var(--panel-2)] px-3 py-2 text-xs font-semibold uppercase text-slate-500">
         <span>Datum</span>
         <span>Kategori</span>
         <span>Titel</span>
@@ -37,7 +37,7 @@ export function PostList({ posts }: { posts: DashboardPost[] }) {
         return (
           <Link
             key={post.id}
-            className="grid grid-cols-[6rem_8rem_minmax(12rem,1.2fr)_5rem_8rem_minmax(13rem,1fr)] gap-3 border-b border-[var(--line)] px-3 py-2 text-sm last:border-b-0 hover:bg-[var(--panel-2)]"
+            className="grid min-w-[58rem] grid-cols-[6rem_8rem_minmax(12rem,1.2fr)_5rem_8rem_minmax(13rem,1fr)] gap-3 border-b border-[var(--line)] px-3 py-2 text-sm last:border-b-0 hover:bg-[var(--panel-2)]"
             href={`/posts/${post.id}`}
           >
             <span className="text-slate-500">{formatDate(post.published_at || post.created_at)}</span>

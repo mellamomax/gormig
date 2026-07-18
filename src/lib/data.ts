@@ -1,8 +1,9 @@
 import { createHash } from "crypto";
 import { getSupabaseAdmin, hasSupabaseConfig } from "@/lib/supabase/server";
 import { EXPLAIN_LEVELS } from "@/lib/explain-level";
+import { addDays, inferHorizonDays, toDateOnly } from "@/lib/market/horizon";
 import type { AnalysisResponse } from "@/lib/schemas";
-import type { Creator, DashboardPost, Mention, OutcomeEvaluation, Post, Signal, SourcePost } from "@/lib/types";
+import type { Creator, DashboardPost, Mention, OutcomeEvaluation, PaperTrade, PaperTradingSettings, Post, Signal, SourcePost } from "@/lib/types";
 
 const DEFAULT_USERNAME = process.env.TIKTOK_USERNAME || "stockrobber";
 const DEFAULT_PROFILE_URL = `https://www.tiktok.com/@${DEFAULT_USERNAME}`;
@@ -88,6 +89,147 @@ export async function listDashboardPosts(filters: {
   return rows;
 }
 
+
+const DEFAULT_PAPER_SETTINGS: PaperTradingSettings = {
+  id: true,
+  enabled: false,
+  starting_cash: 100000,
+  allocation_per_trade: 10000,
+  activated_at: null,
+  updated_at: new Date(0).toISOString(),
+};
+
+function tableMissing(error: { message?: string } | null) {
+  return Boolean(error?.message?.includes("paper_settings") || error?.message?.includes("paper_trades"));
+}
+
+export async function getPaperTradingSettings(): Promise<PaperTradingSettings> {
+  if (!canUseDatabase()) return DEFAULT_PAPER_SETTINGS;
+
+  const supabase = getSupabaseAdmin();
+  const { data, error } = await supabase.from("paper_settings").select("*").eq("id", true).maybeSingle();
+  if (error) {
+    if (tableMissing(error)) return DEFAULT_PAPER_SETTINGS;
+    throw new Error(error.message);
+  }
+  if (data) return data as PaperTradingSettings;
+
+  const { data: created, error: createError } = await supabase
+    .from("paper_settings")
+    .insert({ id: true, enabled: false, starting_cash: 100000, allocation_per_trade: 10000 })
+    .select("*")
+    .single();
+
+  if (createError) {
+    if (tableMissing(createError)) return DEFAULT_PAPER_SETTINGS;
+    throw new Error(createError.message);
+  }
+
+  return created as PaperTradingSettings;
+}
+
+export async function setPaperTradingEnabled(enabled: boolean) {
+  const supabase = getSupabaseAdmin();
+  const { error } = await supabase
+    .from("paper_settings")
+    .upsert(
+      {
+        id: true,
+        enabled,
+        starting_cash: DEFAULT_PAPER_SETTINGS.starting_cash,
+        allocation_per_trade: DEFAULT_PAPER_SETTINGS.allocation_per_trade,
+        activated_at: enabled ? new Date().toISOString() : null,
+      },
+      { onConflict: "id" },
+    );
+
+  if (error) throw new Error(error.message);
+}
+
+export async function listPaperTrades(): Promise<PaperTrade[]> {
+  if (!canUseDatabase()) return [];
+  const { data, error } = await getSupabaseAdmin().from("paper_trades").select("*").order("created_at", { ascending: false }).limit(200);
+  if (error) {
+    if (tableMissing(error)) return [];
+    throw new Error(error.message);
+  }
+  return (data || []) as PaperTrade[];
+}
+
+export async function getPaperTradingOverview() {
+  const [settings, trades, outcomes] = await Promise.all([getPaperTradingSettings(), listPaperTrades(), listOutcomeEvaluations()]);
+  const outcomesBySignal = new Map(outcomes.map((outcome) => [outcome.signal_id, outcome]));
+  const settled = trades
+    .map((trade) => ({ trade, outcome: outcomesBySignal.get(trade.signal_id) }))
+    .filter((item) => Number.isFinite(Number(item.outcome?.return_pct)));
+  const allocated = trades.reduce((sum, trade) => sum + Number(trade.allocated_cash || 0), 0);
+  const activeAllocated = trades
+    .filter((trade) => trade.status === "planned" && !Number.isFinite(Number(outcomesBySignal.get(trade.signal_id)?.return_pct)))
+    .reduce((sum, trade) => sum + Number(trade.allocated_cash || 0), 0);
+  const realizedPnl = settled.reduce((sum, item) => sum + Number(item.trade.allocated_cash || 0) * (Number(item.outcome?.return_pct || 0) / 100), 0);
+  const wins = settled.filter((item) => item.outcome?.is_success).length;
+  const settledCash = settled.reduce((sum, item) => sum + Number(item.trade.allocated_cash || 0), 0);
+
+  return {
+    settings,
+    trades,
+    activeTrades: trades.filter((trade) => trade.status === "planned" && !Number.isFinite(Number(outcomesBySignal.get(trade.signal_id)?.return_pct))).length,
+    settledTrades: settled.length,
+    allocated,
+    activeAllocated,
+    cashAvailable: Number(settings.starting_cash || 0) - activeAllocated,
+    realizedPnl,
+    paperValue: Number(settings.starting_cash || 0) + realizedPnl,
+    returnPct: settledCash ? realizedPnl / settledCash : null,
+    hitRate: settled.length ? wins / settled.length : null,
+  };
+}
+
+function expectationForPaperTrade(mention: Mention, signal: Signal) {
+  if (signal.action === "BUY_CANDIDATE") return `${mention.company_name} förväntas stiga${mention.time_horizon ? ` inom ${mention.time_horizon}` : ""}.`;
+  return signal.reasoning;
+}
+
+export async function createPaperTradesForPost(postId: string) {
+  const settings = await getPaperTradingSettings();
+  if (!settings.enabled) return { created: 0, skipped: 0 };
+
+  const post = await getPostWithAnalysis(postId);
+  const rows = (post.mentions || []).flatMap((mention) =>
+    (mention.signals || []).map((signal) => ({ mention, signal })),
+  );
+
+  const trades = rows
+    .filter(({ mention, signal }) => signal.action === "BUY_CANDIDATE" && Boolean(mention.ticker))
+    .flatMap(({ mention, signal }) => {
+      const horizonDays = inferHorizonDays(mention.time_horizon);
+      if (horizonDays === null) return [];
+      const sourceDate = post.published_at || post.created_at;
+      const plannedExit = toDateOnly(addDays(new Date(sourceDate), horizonDays));
+      return {
+        signal_id: signal.id,
+        mention_id: mention.id,
+        post_id: post.id,
+        ticker: mention.ticker!,
+        company_name: mention.company_name,
+        action: signal.action,
+        status: "planned",
+        allocated_cash: settings.allocation_per_trade,
+        horizon_label: mention.time_horizon,
+        horizon_days: horizonDays,
+        planned_exit_date: plannedExit,
+        thesis: mention.thesis,
+        expectation: expectationForPaperTrade(mention, signal),
+        risk_level: signal.risk_level,
+      };
+    });
+
+  if (trades.length === 0) return { created: 0, skipped: rows.length };
+
+  const { error } = await getSupabaseAdmin().from("paper_trades").upsert(trades, { onConflict: "signal_id", ignoreDuplicates: true });
+  if (error) throw new Error(error.message);
+  return { created: trades.length, skipped: rows.length - trades.length };
+}
 export async function getDashboardStats() {
   const posts = await listDashboardPosts();
   const mentions = posts.flatMap((post) => post.mentions || []);
@@ -287,6 +429,7 @@ export async function replacePostAnalysis(postId: string, analysis: AnalysisResp
     .eq("id", postId);
 
   if (updateError) throw new Error(updateError.message);
+  await createPaperTradesForPost(postId);
 }
 
 export async function tryAcquireLock(key: string, holdSeconds = 300) {

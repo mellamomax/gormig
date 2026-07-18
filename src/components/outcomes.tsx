@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { BarChart3, RefreshCw } from "lucide-react";
+import { BarChart3 } from "lucide-react";
 import { updateOutcomesAction } from "@/app/actions";
 import { SubmitButton } from "@/components/submit-button";
 import type { Mention, OutcomeEvaluation, Post, Signal } from "@/lib/types";
@@ -28,7 +28,7 @@ export function OutcomeUpdateForm({ postId }: { postId?: string }) {
   return (
     <form action={updateOutcomesAction}>
       {postId ? <input type="hidden" name="postId" value={postId} /> : null}
-      <SubmitButton label={postId ? "Uppdatera uppföljning" : "Uppdatera all uppföljning"} pendingLabel="Hämtar faktisk data..." tone="accent" />
+      <SubmitButton label={postId ? "Uppdatera" : "Uppdatera utfall"} pendingLabel="Hämtar data..." tone="accent" />
     </form>
   );
 }
@@ -36,35 +36,29 @@ export function OutcomeUpdateForm({ postId }: { postId?: string }) {
 export function OutcomeList({ outcomes }: { outcomes: Array<OutcomeEvaluation & { signals?: Signal; mentions?: Mention; posts?: Post }> }) {
   if (outcomes.length === 0) {
     return (
-      <section className="rounded border border-dashed border-[var(--line)] bg-[var(--panel)] p-6 text-sm text-slate-600">
-        Ingen uppföljning ännu. Kör “Uppdatera all uppföljning” när det finns analyser med ticker och publiceringsdatum.
+      <section className="rounded border border-dashed border-[var(--line)] bg-[var(--panel)] p-5 text-sm text-slate-600">
+        Ingen uppföljning ännu.
       </section>
     );
   }
 
   return (
-    <section className="overflow-hidden rounded border border-[var(--line)] bg-[var(--panel)]">
-      <div className="grid grid-cols-[1fr_0.7fr_0.8fr_0.8fr_0.8fr] gap-3 border-b border-[var(--line)] bg-[var(--panel-2)] px-4 py-3 text-xs font-semibold uppercase text-slate-500">
-        <span>Signal</span>
-        <span>Resultat</span>
-        <span>Period</span>
-        <span>Avkastning</span>
-        <span>Pris</span>
+    <section className="overflow-x-auto rounded border border-[var(--line)] bg-[var(--panel)]">
+      <div className="grid min-w-[44rem] grid-cols-[1fr_7rem_8rem_7rem_8rem] gap-3 border-b border-[var(--line)] bg-[var(--panel-2)] px-3 py-2 text-xs font-semibold uppercase text-slate-500">
+        <span>Signal</span><span>Resultat</span><span>Period</span><span>Avkastning</span><span>Pris</span>
       </div>
       {outcomes.slice(0, 20).map((outcome) => (
-        <article key={outcome.id} className="grid grid-cols-[1fr_0.7fr_0.8fr_0.8fr_0.8fr] gap-3 border-b border-[var(--line)] px-4 py-3 text-sm last:border-b-0">
+        <article key={outcome.id} className="grid min-w-[44rem] grid-cols-[1fr_7rem_8rem_7rem_8rem] gap-3 border-b border-[var(--line)] px-3 py-2 text-sm last:border-b-0">
           <div className="min-w-0">
             <Link className="font-semibold hover:text-[var(--accent)]" href={`/posts/${outcome.post_id}`}>
               {outcome.ticker} · {outcome.action}
             </Link>
             <p className="truncate text-xs text-slate-500">{outcome.mentions?.company_name || outcome.posts?.caption || "Analys"}</p>
           </div>
-          <div className={outcome.is_success ? "font-semibold text-emerald-700" : outcome.is_success === false ? "font-semibold text-red-700" : "font-semibold text-slate-600"}>
-            {verdictLabel(outcome.verdict)}
-          </div>
-          <div className="text-slate-600">{outcome.start_date || "-"} → {outcome.target_date || "-"}</div>
+          <div className={outcome.is_success ? "font-semibold text-emerald-700" : outcome.is_success === false ? "font-semibold text-red-700" : "font-semibold text-slate-600"}>{verdictLabel(outcome.verdict)}</div>
+          <div className="truncate text-slate-600">{outcome.start_date || "-"} → {outcome.target_date || "-"}</div>
           <div className={Number(outcome.return_pct || 0) >= 0 ? "font-semibold text-emerald-700" : "font-semibold text-red-700"}>{formatPct(outcome.return_pct)}</div>
-          <div className="text-slate-600">{outcome.start_price || "-"} → {outcome.target_price || "-"}</div>
+          <div className="truncate text-slate-600">{outcome.start_price || "-"} → {outcome.target_price || "-"}</div>
         </article>
       ))}
     </section>
