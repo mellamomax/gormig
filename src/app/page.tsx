@@ -22,6 +22,14 @@ function Stat({ label, value }: { label: string; value: string | number }) {
   );
 }
 
+function OutcomeErrorPanel() {
+  return (
+    <section className="rounded border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-950">
+      Uppföljning kunde inte köras eftersom marknadsdata saknas. Lägg till <span className="mono">ALPHA_VANTAGE_API_KEY</span> i Vercel först.
+    </section>
+  );
+}
+
 function SetupPanel() {
   return (
     <section className="rounded border border-amber-200 bg-amber-50 p-4 text-amber-950">
@@ -71,6 +79,7 @@ export default async function Home({ searchParams }: { searchParams?: Promise<Re
 
       <div className="mx-auto grid max-w-7xl gap-4 px-5 py-4">
         {!hasDb ? <SetupPanel /> : null}
+        {params.outcomeError === "market-data" ? <OutcomeErrorPanel /> : null}
         <DashboardTabs active={activeTab} />
 
         {activeTab === "overview" ? (

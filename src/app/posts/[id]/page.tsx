@@ -13,10 +13,12 @@ function formatDate(value: string | null) {
   return new Intl.DateTimeFormat("sv-SE", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
 }
 
-export default async function PostPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function PostPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams?: Promise<Record<string, string | string[] | undefined>> }) {
   if (!canUseDatabase()) notFound();
   const { id } = await params;
   const post = await getPostWithAnalysis(id);
+  const rawParams = searchParams ? await searchParams : {};
+  const outcomeError = Array.isArray(rawParams.outcomeError) ? rawParams.outcomeError[0] : rawParams.outcomeError;
   if (!post) notFound();
   const outcomes = (await listOutcomeEvaluations()).filter((outcome) => outcome.post_id === post.id);
 
@@ -51,6 +53,9 @@ export default async function PostPage({ params }: { params: Promise<{ id: strin
               </form>
             ) : null}
           </div>
+          {outcomeError === "market-data" ? (
+            <p className="mt-4 rounded border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">Uppföljning kunde inte köras eftersom marknadsdata saknas. Lägg till <span className="mono">ALPHA_VANTAGE_API_KEY</span> i Vercel först.</p>
+          ) : null}
           {(post.mentions || []).some((mention) => (mention.signals || []).length > 0) ? (
             <div className="mt-4"><OutcomeUpdateForm postId={post.id} /></div>
           ) : null}

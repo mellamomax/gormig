@@ -58,7 +58,11 @@ export async function scrapePostsAction(formData: FormData) {
 
 export async function updateOutcomesAction(formData: FormData) {
   const postId = getString(formData, "postId") || undefined;
-  await updateOutcomeEvaluations(postId);
-  revalidatePath("/");
-  if (postId) revalidatePath(`/posts/${postId}`);
+  try {
+    await updateOutcomeEvaluations(postId);
+    revalidatePath("/");
+    if (postId) revalidatePath(`/posts/${postId}`);
+  } catch {
+    redirect(postId ? `/posts/${postId}?outcomeError=market-data` : "/?tab=outcomes&outcomeError=market-data");
+  }
 }
