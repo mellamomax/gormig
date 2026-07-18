@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, ExternalLink } from "lucide-react";
-import { analyzePostAction, transcribePostAction } from "@/app/actions";
+import { analyzePostAction, processPostAction } from "@/app/actions";
 import { RiskBadge, SignalBadge, StatusBadge } from "@/components/badges";
 import { OutcomeUpdateForm } from "@/components/outcomes";
 import { ReliabilityDots } from "@/components/reliability-dots";
@@ -56,6 +56,9 @@ export default async function PostPage({ params, searchParams }: { params: Promi
   const rawParams = searchParams ? await searchParams : {};
   const outcomeError = firstParam(rawParams.outcomeError);
   const outcomeMessage = firstParam(rawParams.outcomeMessage);
+  const processError = firstParam(rawParams.processError);
+  const processMessage = firstParam(rawParams.processMessage);
+  const processStatus = firstParam(rawParams.processStatus);
   const outcomeStatus = firstParam(rawParams.outcomeStatus);
   const checked = firstParam(rawParams.checked) || "0";
   const updated = firstParam(rawParams.updated) || "0";
@@ -88,19 +91,24 @@ export default async function PostPage({ params, searchParams }: { params: Promi
             <Link className="inline-flex items-center gap-2 rounded border border-[var(--line)] px-3 py-2 text-sm font-medium" href={post.url} target="_blank">
               <ExternalLink size={15} /> Öppna TikTok
             </Link>
-            {post.media_url && !post.transcript ? (
-              <form action={transcribePostAction}>
+            {post.processing_status !== "analyzed" && (post.media_url || post.transcript) ? (
+              <form action={processPostAction}>
                 <input type="hidden" name="postId" value={post.id} />
-                <SubmitButton label="Transkribera" pendingLabel="Transkriberar..." tone="accent" className="px-3" />
+                <SubmitButton label={post.transcript ? "Analysera video" : "Transkribera + analysera"} pendingLabel="Bearbetar..." tone="accent" className="px-3" />
               </form>
             ) : null}
-            {post.transcript ? (
+            {post.processing_status === "analyzed" && post.transcript ? (
               <form action={analyzePostAction}>
                 <input type="hidden" name="postId" value={post.id} />
                 <SubmitButton label="Analysera igen" pendingLabel="Analyserar..." className="px-3" />
               </form>
             ) : null}
           </div>
+          {!post.media_url && !post.transcript ? (
+            <p className="mt-4 rounded border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">
+              Videon saknar transkription och hämtbar media-URL. Lägg in transkriptionen manuellt för att analysera den.
+            </p>
+          ) : null}
           {outcomeError ? (
             <p className="mt-4 rounded border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">Uppföljning kunde inte köras. Fel: {outcomeMessage || "Okänt fel"}</p>
           ) : null}
@@ -110,6 +118,10 @@ export default async function PostPage({ params, searchParams }: { params: Promi
               {outcomeErrors.length ? <p className="mt-2 font-medium">Felorsak: {outcomeErrors.join(" / ")}</p> : null}
             </div>
           ) : null}
+          {processError ? (
+            <p className="mt-4 rounded border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">Analys kunde inte köras. Fel: {processMessage || "Okänt fel"}</p>
+          ) : null}
+          {processStatus ? <p className="mt-4 rounded border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-950">Videon är transkriberad och analyserad.</p> : null}
           {(post.mentions || []).some((mention) => (mention.signals || []).length > 0) ? (
             <div className="mt-4"><OutcomeUpdateForm postId={post.id} /></div>
           ) : null}

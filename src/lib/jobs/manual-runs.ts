@@ -49,6 +49,36 @@ export async function transcribePost(postId: string) {
   }
 }
 
+export async function processPost(postId: string, explainLevel: ExplainLevel = DEFAULT_EXPLAIN_LEVEL) {
+  const post = await getPostWithAnalysis(postId);
+
+  await setPostStatus(postId, "processing");
+  try {
+    let transcript = post.transcript;
+    let transcribed = false;
+
+    if (!transcript) {
+      if (!post.media_url) {
+        throw new Error("Videon saknar media-URL. Lägg in transkriptionen manuellt eller justera Apify så video-URL följer med.");
+      }
+
+      transcript = await transcribeMediaUrl(post.media_url);
+      await updatePostTranscript(postId, transcript);
+      transcribed = true;
+    }
+
+    const analysis = await analyzeTranscript(transcript, explainLevel);
+    await replacePostAnalysis(postId, analysis);
+    const report = { postId, explainLevel, transcribed, analyzed: true, mentions: analysis.mentions.length };
+    await writeRunLog("manual_process", "completed", report);
+    return report;
+  } catch (error) {
+    await setPostStatus(postId, "failed", getErrorMessage(error));
+    await writeRunLog("manual_process", "failed", { postId, error: getErrorMessage(error) });
+    throw error;
+  }
+}
+
 export async function scrapeLatestPosts(limit: number) {
   const safeLimit = Math.max(1, Math.min(limit, 50));
   const lockKey = "manual_scrape";
@@ -65,8 +95,26 @@ export async function scrapeLatestPosts(limit: number) {
     });
     const posts = await source.fetchLatestPosts();
     const result = await saveSourcePosts(posts);
-    await writeRunLog("manual_scrape", "completed", { limit: safeLimit, ...result });
-    return result;
+    const processErrors: string[] = [];
+    let processed = 0;
+
+    for (const postId of result.insertedPostIds) {
+      try {
+        await processPost(postId);
+        processed += 1;
+      } catch (error) {
+        processErrors.push(getErrorMessage(error));
+      }
+    }
+
+    const report = {
+      ...result,
+      processed,
+      processFailed: processErrors.length,
+      processErrors,
+    };
+    await writeRunLog("manual_scrape", processErrors.length ? "failed" : "completed", { limit: safeLimit, ...report });
+    return report;
   } catch (error) {
     await writeRunLog("manual_scrape", "failed", { limit: safeLimit, error: getErrorMessage(error) });
     throw error;

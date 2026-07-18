@@ -302,7 +302,7 @@ export async function createManualTranscriptPost(input: {
 export async function saveSourcePosts(posts: SourcePost[]) {
   const creator = await ensureDefaultCreator();
   if (posts.length === 0) {
-    return { found: 0, inserted: 0, skipped: 0 };
+    return { found: 0, inserted: 0, skipped: 0, insertedPostIds: [] as string[] };
   }
 
   const supabase = getSupabaseAdmin();
@@ -318,26 +318,34 @@ export async function saveSourcePosts(posts: SourcePost[]) {
   const newPosts = posts.filter((post) => !existingIds.has(post.platformPostId));
 
   if (newPosts.length === 0) {
-    return { found: posts.length, inserted: 0, skipped: posts.length };
+    return { found: posts.length, inserted: 0, skipped: posts.length, insertedPostIds: [] as string[] };
   }
 
-  const { error } = await supabase.from("posts").insert(
-    newPosts.map((post) => ({
-      creator_id: creator.id,
-      platform_post_id: post.platformPostId,
-      url: post.url,
-      caption: post.caption || null,
-      published_at: post.publishedAt || null,
-      cover_url: post.coverUrl || null,
-      media_url: post.mediaUrl || null,
-      duration_seconds: post.durationSeconds || null,
-      processing_status: "new",
-      raw_metadata: post.rawMetadata,
-    })),
-  );
+  const { data, error } = await supabase
+    .from("posts")
+    .insert(
+      newPosts.map((post) => ({
+        creator_id: creator.id,
+        platform_post_id: post.platformPostId,
+        url: post.url,
+        caption: post.caption || null,
+        published_at: post.publishedAt || null,
+        cover_url: post.coverUrl || null,
+        media_url: post.mediaUrl || null,
+        duration_seconds: post.durationSeconds || null,
+        processing_status: "new",
+        raw_metadata: post.rawMetadata,
+      })),
+    )
+    .select("id");
 
   if (error) throw new Error(error.message);
-  return { found: posts.length, inserted: newPosts.length, skipped: posts.length - newPosts.length };
+  return {
+    found: posts.length,
+    inserted: newPosts.length,
+    skipped: posts.length - newPosts.length,
+    insertedPostIds: (data || []).map((row: { id: string }) => row.id),
+  };
 }
 
 export async function updatePostTranscript(postId: string, transcript: string) {

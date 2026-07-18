@@ -296,9 +296,16 @@ function ScrapeErrorPanel({ message }: { message: string }) {
 }
 
 function ScrapeResultPanel({ params }: { params: Record<string, string> }) {
+  const processed = Number(params.processed || 0);
+  const processFailed = Number(params.processFailed || 0);
+  const processErrors = (params.processErrors || "").split(" | ").filter(Boolean);
+
   return (
-    <section className="rounded border border-emerald-200 bg-emerald-50 p-4 text-sm leading-6 text-emerald-950">
-      Scrape klar: hittade {params.found || "0"}, nya {params.inserted || "0"}, redan sparade {params.skipped || "0"}.
+    <section className={`rounded border p-4 text-sm leading-6 ${processFailed ? "border-amber-200 bg-amber-50 text-amber-950" : "border-emerald-200 bg-emerald-50 text-emerald-950"}`}>
+      <p>
+        Scrape klar: hittade {params.found || "0"}, nya {params.inserted || "0"}, redan sparade {params.skipped || "0"}. Analyserade {processed}, misslyckade {processFailed}.
+      </p>
+      {processErrors.length ? <p className="mt-2 font-medium">Felorsak: {processErrors.join(" / ")}</p> : null}
     </section>
   );
 }

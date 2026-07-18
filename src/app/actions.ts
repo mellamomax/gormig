@@ -5,7 +5,7 @@ import { redirect } from "next/navigation";
 import { createManualTranscriptPost, setPaperTradingEnabled } from "@/lib/data";
 import { parseExplainLevel } from "@/lib/explain-level";
 import { getErrorMessage } from "@/lib/errors";
-import { analyzePost, scrapeLatestPosts, transcribePost } from "@/lib/jobs/manual-runs";
+import { analyzePost, processPost, scrapeLatestPosts, transcribePost } from "@/lib/jobs/manual-runs";
 import { updateOutcomeEvaluations } from "@/lib/jobs/outcomes";
 import { generateTitleFromTranscript } from "@/lib/title";
 
@@ -52,7 +52,15 @@ function scrapeReportUrl(report: Awaited<ReturnType<typeof scrapeLatestPosts>>) 
     found: String(report.found),
     inserted: String(report.inserted),
     skipped: String(report.skipped),
+    processed: String(report.processed),
+    processFailed: String(report.processFailed),
   });
+  const errors = report.processErrors
+    .slice(0, 3)
+    .map((error) => (error.length > 220 ? `${error.slice(0, 220)}...` : error))
+    .join(" | ");
+  if (errors) params.set("processErrors", errors);
+
   return `/?${params}`;
 }
 
@@ -91,6 +99,22 @@ export async function transcribePostAction(formData: FormData) {
   await transcribePost(postId);
   revalidatePath("/");
   revalidatePath(`/posts/${postId}`);
+}
+
+export async function processPostAction(formData: FormData) {
+  const postId = getString(formData, "postId");
+  if (!postId) throw new Error("Post id saknas.");
+
+  try {
+    await processPost(postId, parseExplainLevel(getString(formData, "explainLevel")));
+    revalidatePath("/");
+    revalidatePath(`/posts/${postId}`);
+  } catch (error) {
+    console.error("Manual post processing failed", { postId, message: getErrorMessage(error) });
+    redirect(`/posts/${postId}?processError=1&processMessage=${encodeURIComponent(getErrorMessage(error).slice(0, 500))}`);
+  }
+
+  redirect(`/posts/${postId}?processStatus=1`);
 }
 
 export async function scrapePostsAction(formData: FormData) {
