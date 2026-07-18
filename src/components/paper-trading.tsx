@@ -17,15 +17,15 @@ export function PaperTradingPanel({ overview, compact = false }: { overview: Pap
   const enabled = overview.settings.enabled;
 
   return (
-    <section className="rounded border border-[var(--line)] bg-[var(--panel)] p-4">
+    <section className="rounded-xl border border-[var(--line)] bg-[var(--panel)] p-4 shadow-sm">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <div className="flex items-center gap-2 text-sm font-semibold text-slate-700"><WalletCards size={16} /> Paper trading</div>
-          <p className={`mt-1 font-semibold ${enabled ? "text-emerald-700" : "text-slate-500"}`}>{enabled ? "Aktiv från nu" : "Avstängd"}</p>
+          <div className="flex items-center gap-2 text-sm font-bold text-slate-700"><WalletCards size={16} /> Paper trading</div>
+          <p className={`mt-1 text-xl font-black ${enabled ? "text-emerald-700" : "text-slate-500"}`}>{enabled ? "Aktiv" : "Av"}</p>
         </div>
         <form action={togglePaperTradingAction}>
           <input type="hidden" name="enabled" value={enabled ? "no" : "yes"} />
-          <button className={`inline-flex h-10 items-center gap-2 rounded px-3 text-sm font-semibold text-white ${enabled ? "bg-slate-700" : "bg-[var(--accent)]"}`} type="submit">
+          <button className={`inline-flex h-10 items-center gap-2 rounded-lg px-3 text-sm font-bold text-white shadow-sm ${enabled ? "bg-slate-700" : "bg-[var(--accent)]"}`} type="submit">
             {enabled ? <PauseCircle size={16} /> : <PlayCircle size={16} />}
             {enabled ? "Pausa" : "Aktivera"}
           </button>
@@ -61,9 +61,9 @@ export function PaperTradingPanel({ overview, compact = false }: { overview: Pap
 function Metric({ label, value, tone }: { label: string; value: string; tone?: "good" | "bad" }) {
   const color = tone === "good" ? "text-emerald-700" : tone === "bad" ? "text-red-700" : "text-[var(--foreground)]";
   return (
-    <div>
-      <div className="text-xs text-slate-500">{label}</div>
-      <div className={`mt-1 text-lg font-semibold ${color}`}>{value}</div>
+    <div className="rounded-lg bg-[var(--panel-2)] p-3">
+      <div className="text-xs font-semibold uppercase text-slate-500">{label}</div>
+      <div className={`mt-1 text-base font-black ${color}`}>{value}</div>
     </div>
   );
 }

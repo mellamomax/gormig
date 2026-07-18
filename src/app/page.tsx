@@ -1,12 +1,26 @@
-import { Activity, Database, ShieldCheck, Sparkles } from "lucide-react";
+import Link from "next/link";
+import { Activity, ArrowRight, CheckCircle2, Clock3, Database, ShieldCheck, Target } from "lucide-react";
 import { DashboardTabs } from "@/components/dashboard-tabs";
 import { FilterForm, ManualScrapeForm, ManualTranscriptForm } from "@/components/forms";
 import { AccuracySummary, OutcomeList, OutcomeUpdateForm } from "@/components/outcomes";
 import { PaperTradingPanel } from "@/components/paper-trading";
 import { PostList } from "@/components/post-list";
 import { canUseDatabase, getAccuracyOverview, getDashboardStats, getPaperTradingOverview, listDashboardPosts, listOutcomeEvaluations } from "@/lib/data";
+import { addDays, inferHorizonDays, toDateOnly } from "@/lib/market/horizon";
 import { hasOpenAIConfig } from "@/lib/openai/client";
-import type { PaperTradingSettings } from "@/lib/types";
+import { defaultSummary, getHeadline, getSummaryMap } from "@/lib/summary";
+import type { DashboardPost, Mention, OutcomeEvaluation, PaperTradingSettings, Signal } from "@/lib/types";
+
+type ActionItem = {
+  post: DashboardPost;
+  mention: Mention;
+  signal: Signal;
+  headline: string;
+  summary: string;
+  targetDate: string | null;
+  daysLeft: number | null;
+  priority: number;
+};
 
 function normalizeParams(input: Record<string, string | string[] | undefined>) {
   return Object.fromEntries(
@@ -14,12 +28,213 @@ function normalizeParams(input: Record<string, string | string[] | undefined>) {
   );
 }
 
+function formatShortDate(value: string | null) {
+  if (!value) return "Oklar";
+  return new Intl.DateTimeFormat("sv-SE", { month: "short", day: "numeric" }).format(new Date(value));
+}
+
+function horizonStatus(item: ActionItem) {
+  if (item.daysLeft === null) return "Oklar horisont";
+  if (item.daysLeft < 0) return "Bör följas upp";
+  if (item.daysLeft === 0) return "Idag";
+  if (item.daysLeft === 1) return "Imorgon";
+  return `${item.daysLeft} dagar kvar`;
+}
+
+function actionMeta(action: Signal["action"]) {
+  const map = {
+    BUY_CANDIDATE: {
+      label: "Agera",
+      verb: "Bevaka köp",
+      badge: "bg-emerald-500 text-white",
+      panel: "border-emerald-200 bg-emerald-50",
+      text: "text-emerald-950",
+    },
+    WATCH: {
+      label: "Bevaka",
+      verb: "Vänta på trigger",
+      badge: "bg-cyan-600 text-white",
+      panel: "border-cyan-200 bg-cyan-50",
+      text: "text-cyan-950",
+    },
+    HOLD: {
+      label: "Avvakta",
+      verb: "Behåll koll",
+      badge: "bg-slate-700 text-white",
+      panel: "border-slate-200 bg-slate-50",
+      text: "text-slate-950",
+    },
+    REDUCE: {
+      label: "Minska",
+      verb: "Var försiktig",
+      badge: "bg-amber-500 text-white",
+      panel: "border-amber-200 bg-amber-50",
+      text: "text-amber-950",
+    },
+    AVOID: {
+      label: "Undvik",
+      verb: "Ingen entry",
+      badge: "bg-red-600 text-white",
+      panel: "border-red-200 bg-red-50",
+      text: "text-red-950",
+    },
+    INSUFFICIENT_DATA: {
+      label: "Saknas",
+      verb: "Ingen action",
+      badge: "bg-slate-300 text-slate-900",
+      panel: "border-slate-200 bg-slate-50",
+      text: "text-slate-950",
+    },
+  } satisfies Record<Signal["action"], { label: string; verb: string; badge: string; panel: string; text: string }>;
+  return map[action];
+}
+
+function riskLabel(risk: Signal["risk_level"] | undefined) {
+  if (risk === "high") return "Hög risk";
+  if (risk === "medium") return "Medelrisk";
+  if (risk === "low") return "Låg risk";
+  return "Risk oklar";
+}
+
+function signalPriority(signal: Signal, daysLeft: number | null) {
+  const actionScore = signal.action === "BUY_CANDIDATE" ? 0 : signal.action === "WATCH" ? 2 : signal.action === "REDUCE" || signal.action === "AVOID" ? 4 : 6;
+  const timeScore = daysLeft === null ? 5 : daysLeft < 0 ? 1 : daysLeft <= 7 ? 0 : daysLeft <= 30 ? 2 : 4;
+  const riskScore = signal.risk_level === "high" ? 2 : signal.risk_level === "unknown" ? 1 : 0;
+  return actionScore + timeScore + riskScore;
+}
+
+function buildActionItems(posts: DashboardPost[], outcomes: OutcomeEvaluation[]) {
+  const outcomesBySignal = new Map(outcomes.map((outcome) => [outcome.signal_id, outcome]));
+  const today = new Date(`${toDateOnly(new Date())}T00:00:00.000Z`);
+  const items: ActionItem[] = [];
+
+  for (const post of posts) {
+    for (const mention of post.mentions || []) {
+      for (const signal of mention.signals || []) {
+        if (signal.action === "INSUFFICIENT_DATA") continue;
+
+        const outcome = outcomesBySignal.get(signal.id);
+        if (outcome && outcome.verdict !== "PENDING") continue;
+
+        const horizonDays = inferHorizonDays(mention.time_horizon);
+        const sourceDate = new Date(post.published_at || post.created_at);
+        const targetDate = horizonDays === null ? null : toDateOnly(addDays(sourceDate, horizonDays));
+        const daysLeft = targetDate === null ? null : Math.ceil((new Date(`${targetDate}T00:00:00.000Z`).getTime() - today.getTime()) / 86400000);
+
+        if (daysLeft !== null && daysLeft < -10) continue;
+
+        items.push({
+          post,
+          mention,
+          signal,
+          headline: getHeadline(post),
+          summary: defaultSummary(getSummaryMap(post)),
+          targetDate,
+          daysLeft,
+          priority: signalPriority(signal, daysLeft),
+        });
+      }
+    }
+  }
+
+  return items.sort((a, b) => a.priority - b.priority || Number(b.signal.confidence) - Number(a.signal.confidence));
+}
+
 function Stat({ label, value, tone }: { label: string; value: string | number; tone?: "good" | "bad" }) {
-  const color = tone === "good" ? "text-emerald-700" : tone === "bad" ? "text-red-700" : "text-[var(--foreground)]";
+  const color = tone === "good" ? "text-emerald-600" : tone === "bad" ? "text-red-600" : "text-[var(--foreground)]";
   return (
-    <div className="rounded border border-[var(--line)] bg-[var(--panel)] p-4">
-      <div className="text-xs font-medium text-slate-500">{label}</div>
-      <div className={`mt-1 text-2xl font-semibold ${color}`}>{value}</div>
+    <div className="rounded-lg border border-[var(--line)] bg-[var(--panel)] p-4 shadow-sm">
+      <div className="text-xs font-semibold uppercase tracking-normal text-slate-500">{label}</div>
+      <div className={`mt-1 text-2xl font-bold ${color}`}>{value}</div>
+    </div>
+  );
+}
+
+function ActionQueue({ items }: { items: ActionItem[] }) {
+  const lead = items[0];
+  const rest = items.slice(1, 6);
+
+  if (!lead) {
+    return (
+      <section className="rounded-xl border border-dashed border-[var(--line)] bg-[var(--panel)] p-6 shadow-sm">
+        <div className="inline-flex rounded-full bg-slate-100 px-3 py-1 text-xs font-bold uppercase text-slate-600">Inget akut</div>
+        <h2 className="mt-4 text-2xl font-bold">Ingen relevant action just nu</h2>
+        <p className="mt-2 max-w-xl text-sm text-slate-600">Nya analyser med ticker och tidshorisont hamnar här automatiskt.</p>
+      </section>
+    );
+  }
+
+  return (
+    <section className="grid gap-3 xl:grid-cols-[1.15fr_0.85fr]">
+      <LeadAction item={lead} />
+      <div className="grid content-start gap-3">
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-bold uppercase tracking-normal text-slate-500">Nästa att följa</h2>
+          <Link className="text-sm font-semibold text-[var(--accent)]" href="/?tab=videos">Alla analyser</Link>
+        </div>
+        {rest.length ? rest.map((item) => <MiniAction key={`${item.signal.id}-${item.post.id}`} item={item} />) : (
+          <div className="rounded-lg border border-[var(--line)] bg-[var(--panel)] p-4 text-sm text-slate-600">Bara en aktuell signal just nu.</div>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function LeadAction({ item }: { item: ActionItem }) {
+  const meta = actionMeta(item.signal.action);
+  return (
+    <article className={`rounded-xl border p-5 shadow-sm ${meta.panel} ${meta.text}`}>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <div className={`inline-flex rounded-full px-3 py-1 text-xs font-bold uppercase ${meta.badge}`}>{meta.label}</div>
+          <h2 className="mt-4 text-4xl font-black tracking-normal">{item.mention.ticker || item.mention.company_name}</h2>
+          <p className="mt-1 text-lg font-semibold">{meta.verb} · {item.mention.company_name}</p>
+        </div>
+        <div className="rounded-lg bg-white/75 p-3 text-right shadow-sm">
+          <div className="text-xs font-semibold uppercase text-slate-500">Horisont</div>
+          <div className="mt-1 text-xl font-black">{horizonStatus(item)}</div>
+          <div className="mt-1 text-xs text-slate-600">{formatShortDate(item.targetDate)}</div>
+        </div>
+      </div>
+
+      <div className="mt-5 grid gap-3 sm:grid-cols-3">
+        <Pill label="Risk" value={riskLabel(item.signal.risk_level)} />
+        <Pill label="Confidence" value={`${Math.round(item.signal.confidence * 100)}%`} />
+        <Pill label="Publicerad" value={formatShortDate(item.post.published_at || item.post.created_at)} />
+      </div>
+
+      <p className="mt-5 max-w-3xl text-base font-semibold leading-7">{item.headline}</p>
+      <p className="mt-2 max-w-3xl text-sm leading-6 opacity-80">{item.summary}</p>
+
+      <div className="mt-5 flex flex-wrap items-center gap-3">
+        <Link className="inline-flex h-11 items-center gap-2 rounded-lg bg-[var(--foreground)] px-4 text-sm font-bold text-white shadow-sm" href={`/posts/${item.post.id}`}>
+          Öppna analys <ArrowRight size={16} />
+        </Link>
+        <span className="text-sm font-semibold">Tid: {item.mention.time_horizon || "oklar"}</span>
+      </div>
+    </article>
+  );
+}
+
+function MiniAction({ item }: { item: ActionItem }) {
+  const meta = actionMeta(item.signal.action);
+  return (
+    <Link className="grid grid-cols-[auto_1fr_auto] items-center gap-3 rounded-lg border border-[var(--line)] bg-[var(--panel)] p-3 shadow-sm hover:border-[var(--accent)]" href={`/posts/${item.post.id}`}>
+      <span className={`rounded px-2 py-1 text-xs font-bold uppercase ${meta.badge}`}>{meta.label}</span>
+      <span className="min-w-0">
+        <span className="block truncate font-bold">{item.mention.ticker || item.mention.company_name}</span>
+        <span className="block truncate text-sm text-slate-600">{item.headline}</span>
+      </span>
+      <span className="text-right text-xs font-bold text-slate-600">{horizonStatus(item)}</span>
+    </Link>
+  );
+}
+
+function Pill({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg bg-white/75 p-3 shadow-sm">
+      <div className="text-xs font-semibold uppercase text-slate-500">{label}</div>
+      <div className="mt-1 font-black">{value}</div>
     </div>
   );
 }
@@ -92,20 +307,21 @@ export default async function Home({ searchParams }: { searchParams?: Promise<Re
     ]);
   }
 
-  const latestAnalyzed = posts.filter((post) => post.processing_status === "analyzed").slice(0, 8);
+  const actionItems = buildActionItems(posts, outcomes);
+  const latestAnalyzed = posts.filter((post) => post.processing_status === "analyzed").slice(0, 6);
 
   return (
     <main className="min-h-screen bg-[var(--background)]">
       <header className="border-b border-[var(--line)] bg-[var(--panel)]">
         <div className="mx-auto grid max-w-7xl gap-3 px-5 py-4 md:grid-cols-[1fr_auto] md:items-center">
           <div>
-            <p className="text-xs font-semibold uppercase tracking-normal text-[var(--accent)]">Privat analysplattform</p>
-            <h1 className="text-2xl font-bold">Stockrobber Agent</h1>
+            <p className="text-xs font-bold uppercase tracking-normal text-[var(--accent)]">Privat beslutsdashboard</p>
+            <h1 className="text-2xl font-black">Stockrobber Agent</h1>
           </div>
-          <div className="flex flex-wrap gap-2 text-xs text-slate-600">
-            <span className="inline-flex items-center gap-1 rounded border border-[var(--line)] px-2 py-1"><ShieldCheck size={14} /> Manuell kontroll</span>
-            <span className="inline-flex items-center gap-1 rounded border border-[var(--line)] px-2 py-1"><Database size={14} /> {hasDb ? "Data redo" : "Data saknas"}</span>
-            <span className="inline-flex items-center gap-1 rounded border border-[var(--line)] px-2 py-1"><Activity size={14} /> {hasOpenAIConfig() ? "AI redo" : "AI saknas"}</span>
+          <div className="flex flex-wrap gap-2 text-xs font-semibold text-slate-600">
+            <span className="inline-flex items-center gap-1 rounded-full border border-[var(--line)] bg-white px-3 py-1"><ShieldCheck size={14} /> Manuellt läge</span>
+            <span className="inline-flex items-center gap-1 rounded-full border border-[var(--line)] bg-white px-3 py-1"><Database size={14} /> {hasDb ? "Data redo" : "Data saknas"}</span>
+            <span className="inline-flex items-center gap-1 rounded-full border border-[var(--line)] bg-white px-3 py-1"><Activity size={14} /> {hasOpenAIConfig() ? "AI redo" : "AI saknas"}</span>
           </div>
         </div>
       </header>
@@ -118,36 +334,32 @@ export default async function Home({ searchParams }: { searchParams?: Promise<Re
 
         {activeTab === "overview" ? (
           <section className="grid gap-4">
-            <section className="grid gap-3 md:grid-cols-[1.2fr_0.8fr]">
-              <div className="rounded border border-[var(--line)] bg-[var(--panel)] p-5">
-                <div className="flex items-center gap-2 text-sm font-semibold text-[var(--accent)]"><Sparkles size={16} /> Kort läge</div>
-                <div className="mt-4 grid gap-3 sm:grid-cols-4">
-                  <Stat label="Analyser" value={stats.analyzed} />
-                  <Stat label="Köpkandidater" value={stats.buyCandidates} />
-                  <Stat label="Väntar utfall" value={accuracy.pending} />
-                  <Stat label="Pricksäkerhet" value={accuracy.hitRate === null ? "-" : `${Math.round(accuracy.hitRate * 100)}%`} tone={accuracy.hitRate !== null && accuracy.hitRate >= 0.5 ? "good" : undefined} />
+            <section className="grid gap-4 xl:grid-cols-[1.55fr_0.7fr]">
+              <ActionQueue items={actionItems} />
+              <aside className="grid content-start gap-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <Stat label="Aktuella" value={actionItems.length} tone={actionItems.length ? "good" : undefined} />
+                  <Stat label="Träff" value={accuracy.hitRate === null ? "-" : `${Math.round(accuracy.hitRate * 100)}%`} tone={accuracy.hitRate !== null && accuracy.hitRate >= 0.5 ? "good" : undefined} />
                 </div>
-              </div>
-              <PaperTradingPanel overview={paper} compact />
+                <PaperTradingPanel overview={paper} compact />
+              </aside>
             </section>
-
-            <section className="grid gap-3 lg:grid-cols-[1fr_0.9fr]">
+            <section className="grid gap-3 xl:grid-cols-[0.75fr_1.25fr]">
               <section className="grid gap-3">
                 <div className="flex items-center justify-between gap-3">
-                  <h2 className="text-lg font-semibold">Senaste analyser</h2>
-                  <a className="text-sm font-medium text-[var(--accent)]" href="/?tab=videos">Alla videos</a>
+                  <h2 className="flex items-center gap-2 text-lg font-black"><Target size={18} /> Senaste analyser</h2>
+                  <Link className="text-sm font-bold text-[var(--accent)]" href="/?tab=videos">Visa alla</Link>
                 </div>
-                <PostList posts={latestAnalyzed.length ? latestAnalyzed : posts.slice(0, 8)} />
+                <PostList posts={latestAnalyzed.length ? latestAnalyzed : posts.slice(0, 6)} />
               </section>
               <section className="grid content-start gap-3">
-                <div className="flex items-center justify-between gap-3 rounded border border-[var(--line)] bg-[var(--panel)] p-4">
-                  <div>
-                    <h2 className="text-base font-semibold">Uppföljning</h2>
-                    <p className="mt-1 text-sm text-slate-600">Kolla faktiska utfall när horisonten passerat.</p>
+                <div className="flex items-center justify-between gap-3 rounded-lg border border-[var(--line)] bg-[var(--panel)] p-4 shadow-sm">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 text-sm font-bold"><Clock3 size={16} /> Utfall</div>
+                    <p className="mt-1 truncate text-sm text-slate-600">Uppdatera när horisonten passerat.</p>
                   </div>
                   <OutcomeUpdateForm />
                 </div>
-                <OutcomeList outcomes={outcomes.slice(0, 5)} />
               </section>
             </section>
           </section>
@@ -166,7 +378,7 @@ export default async function Home({ searchParams }: { searchParams?: Promise<Re
         {activeTab === "outcomes" ? (
           <section className="grid gap-4">
             <div className="flex flex-wrap items-center justify-between gap-3">
-              <h2 className="text-xl font-semibold">Uppföljning</h2>
+              <h2 className="flex items-center gap-2 text-xl font-black"><CheckCircle2 size={20} /> Uppföljning</h2>
               <OutcomeUpdateForm />
             </div>
             <AccuracySummary stats={accuracy} />
