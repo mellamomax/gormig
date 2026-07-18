@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { createManualTranscriptPost } from "@/lib/data";
 import { analyzePost, scrapeLatestPosts, transcribePost } from "@/lib/jobs/manual-runs";
 import { updateOutcomeEvaluations } from "@/lib/jobs/outcomes";
+import { generateTitleFromTranscript } from "@/lib/title";
 
 function getString(formData: FormData, key: string) {
   const value = formData.get(key);
@@ -15,9 +16,11 @@ export async function addManualTranscriptAction(formData: FormData) {
   const transcript = getString(formData, "transcript");
   if (!transcript) throw new Error("Transkription saknas.");
 
+  const caption = getString(formData, "caption") || (await generateTitleFromTranscript(transcript));
+
   const post = await createManualTranscriptPost({
     url: getString(formData, "url"),
-    caption: getString(formData, "caption"),
+    caption,
     publishedAt: getString(formData, "publishedAt") || undefined,
     transcript,
   });
@@ -51,6 +54,7 @@ export async function scrapePostsAction(formData: FormData) {
   await scrapeLatestPosts(limit);
   revalidatePath("/");
 }
+
 export async function updateOutcomesAction(formData: FormData) {
   const postId = getString(formData, "postId") || undefined;
   await updateOutcomeEvaluations(postId);
