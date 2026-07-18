@@ -32,12 +32,20 @@ export function PaperTradingPanel({ overview, compact = false }: { overview: Pap
         </form>
       </div>
 
-      <div className={`mt-4 grid gap-3 ${compact ? "grid-cols-2" : "sm:grid-cols-4"}`}>
-        <Metric label="Kapital" value={money(Number(overview.settings.starting_cash || 0))} />
-        <Metric label="Allokerat" value={money(overview.activeAllocated)} />
-        <Metric label="Resultat" value={money(overview.realizedPnl)} tone={overview.realizedPnl >= 0 ? "good" : "bad"} />
-        <Metric label="Träff" value={percent(overview.hitRate)} />
-      </div>
+      {compact ? (
+        <div className="mt-3 grid grid-cols-3 gap-2">
+          <Metric compact label="Kapital" value={money(Number(overview.settings.starting_cash || 0))} />
+          <Metric compact label="Resultat" value={money(overview.realizedPnl)} tone={overview.realizedPnl >= 0 ? "good" : "bad"} />
+          <Metric compact label="Träff" value={percent(overview.hitRate)} />
+        </div>
+      ) : (
+        <div className="mt-4 grid gap-3 sm:grid-cols-4">
+          <Metric label="Kapital" value={money(Number(overview.settings.starting_cash || 0))} />
+          <Metric label="Allokerat" value={money(overview.activeAllocated)} />
+          <Metric label="Resultat" value={money(overview.realizedPnl)} tone={overview.realizedPnl >= 0 ? "good" : "bad"} />
+          <Metric label="Träff" value={percent(overview.hitRate)} />
+        </div>
+      )}
 
       {!compact && overview.trades.length ? (
         <div className="mt-4 overflow-x-auto rounded border border-[var(--line)]">
@@ -58,12 +66,12 @@ export function PaperTradingPanel({ overview, compact = false }: { overview: Pap
   );
 }
 
-function Metric({ label, value, tone }: { label: string; value: string; tone?: "good" | "bad" }) {
+function Metric({ label, value, tone, compact = false }: { label: string; value: string; tone?: "good" | "bad"; compact?: boolean }) {
   const color = tone === "good" ? "text-emerald-700" : tone === "bad" ? "text-red-700" : "text-[var(--foreground)]";
   return (
-    <div className="rounded-lg bg-[var(--panel-2)] p-3">
+    <div className={`rounded-lg bg-[var(--panel-2)] ${compact ? "p-2" : "p-3"}`}>
       <div className="text-xs font-semibold uppercase text-slate-500">{label}</div>
-      <div className={`mt-1 text-base font-black ${color}`}>{value}</div>
+      <div className={`mt-1 truncate font-black ${compact ? "text-sm" : "text-base"} ${color}`}>{value}</div>
     </div>
   );
 }

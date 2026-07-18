@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Activity, ArrowRight, CheckCircle2, Clock3, Database, ShieldCheck, Target } from "lucide-react";
+import { Activity, ArrowRight, CheckCircle2, Clock3, Database, ShieldCheck } from "lucide-react";
 import { DashboardTabs } from "@/components/dashboard-tabs";
 import { FilterForm, ManualScrapeForm, ManualTranscriptForm } from "@/components/forms";
 import { AccuracySummary, OutcomeList, OutcomeUpdateForm } from "@/components/outcomes";
@@ -143,29 +143,29 @@ function buildActionItems(posts: DashboardPost[], outcomes: OutcomeEvaluation[])
 function Stat({ label, value, tone }: { label: string; value: string | number; tone?: "good" | "bad" }) {
   const color = tone === "good" ? "text-emerald-600" : tone === "bad" ? "text-red-600" : "text-[var(--foreground)]";
   return (
-    <div className="rounded-lg border border-[var(--line)] bg-[var(--panel)] p-4 shadow-sm">
+    <div className="rounded-lg border border-[var(--line)] bg-[var(--panel)] p-3 shadow-sm">
       <div className="text-xs font-semibold uppercase tracking-normal text-slate-500">{label}</div>
-      <div className={`mt-1 text-2xl font-bold ${color}`}>{value}</div>
+      <div className={`mt-1 text-xl font-bold ${color}`}>{value}</div>
     </div>
   );
 }
 
 function ActionQueue({ items }: { items: ActionItem[] }) {
   const lead = items[0];
-  const rest = items.slice(1, 6);
+  const rest = items.slice(1, 4);
 
   if (!lead) {
     return (
-      <section className="rounded-xl border border-dashed border-[var(--line)] bg-[var(--panel)] p-6 shadow-sm">
+      <section className="rounded-xl border border-dashed border-[var(--line)] bg-[var(--panel)] p-4 shadow-sm">
         <div className="inline-flex rounded-full bg-slate-100 px-3 py-1 text-xs font-bold uppercase text-slate-600">Inget akut</div>
-        <h2 className="mt-4 text-2xl font-bold">Ingen relevant action just nu</h2>
+        <h2 className="mt-3 text-xl font-bold">Ingen relevant action just nu</h2>
         <p className="mt-2 max-w-xl text-sm text-slate-600">Nya analyser med ticker och tidshorisont hamnar här automatiskt.</p>
       </section>
     );
   }
 
   return (
-    <section className="grid gap-3 xl:grid-cols-[1.15fr_0.85fr]">
+    <section className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_minmax(18rem,0.72fr)]">
       <LeadAction item={lead} />
       <div className="grid content-start gap-3">
         <div className="flex items-center justify-between">
@@ -183,31 +183,31 @@ function ActionQueue({ items }: { items: ActionItem[] }) {
 function LeadAction({ item }: { item: ActionItem }) {
   const meta = actionMeta(item.signal.action);
   return (
-    <article className={`rounded-xl border p-5 shadow-sm ${meta.panel} ${meta.text}`}>
+    <article className={`rounded-xl border p-4 shadow-sm ${meta.panel} ${meta.text}`}>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <div className={`inline-flex rounded-full px-3 py-1 text-xs font-bold uppercase ${meta.badge}`}>{meta.label}</div>
-          <h2 className="mt-4 text-4xl font-black tracking-normal">{item.mention.ticker || item.mention.company_name}</h2>
-          <p className="mt-1 text-lg font-semibold">{meta.verb} · {item.mention.company_name}</p>
+          <h2 className="mt-3 text-3xl font-black tracking-normal">{item.mention.ticker || item.mention.company_name}</h2>
+          <p className="mt-1 text-base font-semibold">{meta.verb} · {item.mention.company_name}</p>
         </div>
-        <div className="rounded-lg bg-white/75 p-3 text-right shadow-sm">
+        <div className="rounded-lg bg-white/75 p-2.5 text-right shadow-sm">
           <div className="text-xs font-semibold uppercase text-slate-500">Horisont</div>
-          <div className="mt-1 text-xl font-black">{horizonStatus(item)}</div>
+          <div className="mt-1 text-lg font-black">{horizonStatus(item)}</div>
           <div className="mt-1 text-xs text-slate-600">{formatShortDate(item.targetDate)}</div>
         </div>
       </div>
 
-      <div className="mt-5 grid gap-3 sm:grid-cols-3">
+      <div className="mt-3 grid gap-2 sm:grid-cols-3">
         <Pill label="Risk" value={riskLabel(item.signal.risk_level)} />
         <Pill label="Confidence" value={`${Math.round(item.signal.confidence * 100)}%`} />
         <Pill label="Publicerad" value={formatShortDate(item.post.published_at || item.post.created_at)} />
       </div>
 
-      <p className="mt-5 max-w-3xl text-base font-semibold leading-7">{item.headline}</p>
-      <p className="mt-2 max-w-3xl text-sm leading-6 opacity-80">{item.summary}</p>
+      <p className="mt-3 max-w-3xl truncate text-base font-semibold">{item.headline}</p>
+      <p className="mt-1 max-w-3xl truncate text-sm opacity-80">{item.summary}</p>
 
-      <div className="mt-5 flex flex-wrap items-center gap-3">
-        <Link className="inline-flex h-11 items-center gap-2 rounded-lg bg-[var(--foreground)] px-4 text-sm font-bold text-white shadow-sm" href={`/posts/${item.post.id}`}>
+      <div className="mt-4 flex flex-wrap items-center gap-3">
+        <Link className="inline-flex h-9 items-center gap-2 rounded-lg bg-[#071d19] px-3 text-sm font-bold !text-white shadow-sm" href={`/posts/${item.post.id}`}>
           Öppna analys <ArrowRight size={16} />
         </Link>
         <span className="text-sm font-semibold">Tid: {item.mention.time_horizon || "oklar"}</span>
@@ -219,7 +219,7 @@ function LeadAction({ item }: { item: ActionItem }) {
 function MiniAction({ item }: { item: ActionItem }) {
   const meta = actionMeta(item.signal.action);
   return (
-    <Link className="grid grid-cols-[auto_1fr_auto] items-center gap-3 rounded-lg border border-[var(--line)] bg-[var(--panel)] p-3 shadow-sm hover:border-[var(--accent)]" href={`/posts/${item.post.id}`}>
+    <Link className="grid grid-cols-[auto_1fr_auto] items-center gap-3 rounded-lg border border-[var(--line)] bg-[var(--panel)] p-2.5 shadow-sm hover:border-[var(--accent)]" href={`/posts/${item.post.id}`}>
       <span className={`rounded px-2 py-1 text-xs font-bold uppercase ${meta.badge}`}>{meta.label}</span>
       <span className="min-w-0">
         <span className="block truncate font-bold">{item.mention.ticker || item.mention.company_name}</span>
@@ -232,7 +232,7 @@ function MiniAction({ item }: { item: ActionItem }) {
 
 function Pill({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg bg-white/75 p-3 shadow-sm">
+    <div className="rounded-lg bg-white/75 p-2.5 shadow-sm">
       <div className="text-xs font-semibold uppercase text-slate-500">{label}</div>
       <div className="mt-1 font-black">{value}</div>
     </div>
@@ -308,12 +308,10 @@ export default async function Home({ searchParams }: { searchParams?: Promise<Re
   }
 
   const actionItems = buildActionItems(posts, outcomes);
-  const latestAnalyzed = posts.filter((post) => post.processing_status === "analyzed").slice(0, 6);
-
   return (
     <main className="min-h-screen bg-[var(--background)]">
       <header className="border-b border-[var(--line)] bg-[var(--panel)]">
-        <div className="mx-auto grid max-w-7xl gap-3 px-5 py-4 md:grid-cols-[1fr_auto] md:items-center">
+        <div className="mx-auto grid max-w-7xl gap-2 px-4 py-3 md:grid-cols-[1fr_auto] md:items-center">
           <div>
             <p className="text-xs font-bold uppercase tracking-normal text-[var(--accent)]">Privat beslutsdashboard</p>
             <h1 className="text-2xl font-black">Stockrobber Agent</h1>
@@ -326,42 +324,30 @@ export default async function Home({ searchParams }: { searchParams?: Promise<Re
         </div>
       </header>
 
-      <div className="mx-auto grid max-w-7xl gap-4 px-5 py-4">
+      <div className="mx-auto grid max-w-7xl gap-3 px-4 py-3">
         {!hasDb ? <SetupPanel /> : null}
         {params.outcomeError ? <OutcomeErrorPanel message={params.outcomeMessage || "Okänt fel"} /> : null}
         {params.outcomeStatus ? <OutcomeResultPanel params={params} /> : null}
         <DashboardTabs active={activeTab} />
 
         {activeTab === "overview" ? (
-          <section className="grid gap-4">
-            <section className="grid gap-4 xl:grid-cols-[1.55fr_0.7fr]">
-              <ActionQueue items={actionItems} />
-              <aside className="grid content-start gap-3">
-                <div className="grid grid-cols-2 gap-3">
-                  <Stat label="Aktuella" value={actionItems.length} tone={actionItems.length ? "good" : undefined} />
-                  <Stat label="Träff" value={accuracy.hitRate === null ? "-" : `${Math.round(accuracy.hitRate * 100)}%`} tone={accuracy.hitRate !== null && accuracy.hitRate >= 0.5 ? "good" : undefined} />
+          <section className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_20rem]">
+            <ActionQueue items={actionItems} />
+            <aside className="grid content-start gap-3">
+              <div className="grid grid-cols-3 gap-2 lg:grid-cols-2">
+                <Stat label="Aktuella" value={actionItems.length} tone={actionItems.length ? "good" : undefined} />
+                <Stat label="Träff" value={accuracy.hitRate === null ? "-" : `${Math.round(accuracy.hitRate * 100)}%`} tone={accuracy.hitRate !== null && accuracy.hitRate >= 0.5 ? "good" : undefined} />
+                <Stat label="Väntar" value={accuracy.pending} />
+              </div>
+              <PaperTradingPanel overview={paper} compact />
+              <div className="flex items-center justify-between gap-3 rounded-lg border border-[var(--line)] bg-[var(--panel)] p-3 shadow-sm">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 text-sm font-bold"><Clock3 size={16} /> Utfall</div>
+                  <p className="mt-1 truncate text-xs text-slate-600">När horisonten passerat.</p>
                 </div>
-                <PaperTradingPanel overview={paper} compact />
-              </aside>
-            </section>
-            <section className="grid gap-3 xl:grid-cols-[0.75fr_1.25fr]">
-              <section className="grid gap-3">
-                <div className="flex items-center justify-between gap-3">
-                  <h2 className="flex items-center gap-2 text-lg font-black"><Target size={18} /> Senaste analyser</h2>
-                  <Link className="text-sm font-bold text-[var(--accent)]" href="/?tab=videos">Visa alla</Link>
-                </div>
-                <PostList posts={latestAnalyzed.length ? latestAnalyzed : posts.slice(0, 6)} />
-              </section>
-              <section className="grid content-start gap-3">
-                <div className="flex items-center justify-between gap-3 rounded-lg border border-[var(--line)] bg-[var(--panel)] p-4 shadow-sm">
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2 text-sm font-bold"><Clock3 size={16} /> Utfall</div>
-                    <p className="mt-1 truncate text-sm text-slate-600">Uppdatera när horisonten passerat.</p>
-                  </div>
-                  <OutcomeUpdateForm />
-                </div>
-              </section>
-            </section>
+                <OutcomeUpdateForm />
+              </div>
+            </aside>
           </section>
         ) : null}
 

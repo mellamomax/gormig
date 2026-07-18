@@ -12,14 +12,14 @@ const tabs = [
 
 export function DashboardTabs({ active }: { active: string }) {
   return (
-    <nav className="flex flex-wrap gap-2 rounded-xl border border-[var(--line)] bg-[var(--panel)] p-2 shadow-sm">
+    <nav className="flex flex-wrap gap-1.5 rounded-xl border border-[var(--line)] bg-[var(--panel)] p-1.5 shadow-sm">
       {tabs.map((tab) => {
         const selected = active === tab.id;
         const Icon = tab.icon;
         return (
           <Link
             key={tab.id}
-            className={`inline-flex h-10 items-center gap-2 rounded-lg px-3 text-sm font-bold ${selected ? "bg-[var(--foreground)] !text-white shadow-sm" : "text-slate-600 hover:bg-[var(--panel-2)]"}`}
+            className={`inline-flex h-9 items-center gap-2 rounded-lg px-3 text-sm font-bold ${selected ? "bg-[var(--foreground)] !text-white shadow-sm" : "text-slate-600 hover:bg-[var(--panel-2)]"}`}
             href={tab.id === "overview" ? "/" : `/?tab=${tab.id}`}
             aria-current={selected ? "page" : undefined}
           >
