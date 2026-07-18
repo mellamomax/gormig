@@ -319,13 +319,13 @@ export async function listSignalsForOutcomeUpdate(postId?: string) {
   const supabase = getSupabaseAdmin();
   let query = supabase
     .from("signals")
-    .select("*, outcome_evaluations(*), mentions(*, posts(*))")
+    .select("*, mentions(*, posts(*))")
     .order("generated_at", { ascending: false });
 
   const { data, error } = await query;
   if (error) throw new Error(error.message);
 
-  const rows = (data || []) as unknown as Array<Signal & { outcome_evaluations?: OutcomeEvaluation[]; mentions?: Mention & { posts?: Post } }>;
+  const rows = (data || []) as unknown as Array<Signal & { mentions?: Mention & { posts?: Post } }>;
   return rows.filter((signal) => {
     if (postId && signal.mentions?.post_id !== postId) return false;
     if (signal.action === "INSUFFICIENT_DATA") return false;
