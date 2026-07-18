@@ -27,6 +27,7 @@ function outcomeReportUrl(postId: string | undefined, report: Awaited<ReturnType
     checked: String(report.checked),
     updated: String(report.updated),
     pending: String(report.pending),
+    skipped: String(report.skipped),
     noData: String(report.noData),
     failed: String(report.failed),
   });

@@ -56,7 +56,7 @@ export async function updateOutcomeEvaluations(postId?: string) {
   }
 
   const signals = await listSignalsForOutcomeUpdate(postId);
-  const report = { checked: signals.length, updated: 0, pending: 0, noData: 0, failed: 0, errors: [] as string[] };
+  const report = { checked: signals.length, updated: 0, pending: 0, skipped: 0, noData: 0, failed: 0, errors: [] as string[] };
   const priceCache = new Map<string, Awaited<ReturnType<typeof fetchDailyPrices>>>();
 
   for (const signal of signals) {
@@ -70,11 +70,37 @@ export async function updateOutcomeEvaluations(postId?: string) {
       const dateNote = usedCreatedDate ? " Skapandedatum användes eftersom publiceringsdatum saknas." : "";
       const horizonDays = inferHorizonDays(mention.time_horizon);
       const startDate = new Date(sourceDate);
-      const targetDate = addDays(startDate, horizonDays);
       const startDateOnly = toDateOnly(startDate);
+      const symbol = normalizeSymbol(mention.ticker, mention.exchange);
+
+      if (horizonDays === null) {
+        await upsertOutcomeEvaluation({
+          signal_id: signal.id,
+          mention_id: mention.id,
+          post_id: post.id,
+          ticker: mention.ticker,
+          exchange: mention.exchange,
+          action: signal.action,
+          horizon_label: mention.time_horizon,
+          horizon_days: null,
+          start_date: startDateOnly,
+          target_date: null,
+          start_price: null,
+          target_price: null,
+          return_pct: null,
+          is_success: null,
+          verdict: "IGNORED",
+          notes: `Ingen bedömbar tidshorisont hittades i videon. Uppföljning kräver en tidsram som sägs eller tydligt antyds.${dateNote}`,
+          source: "analysis",
+          raw_data: { symbol, reason: "missing_or_unclear_horizon", usedCreatedDate },
+        });
+        report.skipped += 1;
+        continue;
+      }
+
+      const targetDate = addDays(startDate, horizonDays);
       const targetDateOnly = toDateOnly(targetDate);
       const nowDateOnly = toDateOnly(new Date());
-      const symbol = normalizeSymbol(mention.ticker, mention.exchange);
 
       if (targetDateOnly > nowDateOnly) {
         await upsertOutcomeEvaluation({

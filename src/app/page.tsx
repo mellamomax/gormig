@@ -33,6 +33,7 @@ function OutcomeResultPanel({ params }: { params: Record<string, string> }) {
   const checked = Number(params.checked || 0);
   const updated = Number(params.updated || 0);
   const pending = Number(params.pending || 0);
+  const skipped = Number(params.skipped || 0);
   const noData = Number(params.noData || 0);
   const failed = Number(params.failed || 0);
   const empty = checked === 0;
@@ -42,7 +43,7 @@ function OutcomeResultPanel({ params }: { params: Record<string, string> }) {
   return (
     <section className={`rounded border p-4 text-sm leading-6 ${hasFailures ? "border-amber-200 bg-amber-50 text-amber-950" : "border-emerald-200 bg-emerald-50 text-emerald-950"}`}>
       <p>
-        {empty ? "Inga uppföljningsbara signaler hittades. Det krävs en sparad analys med ticker. Manuella videos utan publiceringsdatum använder nu skapandedatum som fallback." : `Uppföljning klar: kontrollerade ${checked}, uppdaterade ${updated}, väntar ${pending}, ingen data ${noData}, misslyckade ${failed}.`}
+        {empty ? "Inga uppföljningsbara signaler hittades. Det krävs en sparad analys med ticker. Manuella videos utan publiceringsdatum använder nu skapandedatum som fallback." : `Uppföljning klar: kontrollerade ${checked}, uppdaterade ${updated}, väntar ${pending}, ignorerade ${skipped}, ingen data ${noData}, misslyckade ${failed}.`}
       </p>
       {errors.length ? <p className="mt-2 font-medium">Felorsak: {errors.join(" / ")}</p> : null}
     </section>

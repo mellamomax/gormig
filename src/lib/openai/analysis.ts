@@ -7,7 +7,8 @@ Return Swedish explanations but keep enum values exactly as specified.
 This is research support, not financial advice. Never present conclusions as certain predictions.
 Keep answers short by default. Only mention what is actually supported by the transcript.
 Signal actions allowed: BUY_CANDIDATE, WATCH, HOLD, REDUCE, AVOID, INSUFFICIENT_DATA.
-Every signal must include concrete reasoning and risk_level.`;
+Every signal must include concrete reasoning and risk_level.
+Time horizon is critical for follow-up accuracy: infer it from explicit wording or strong contextual clues in the transcript, but never invent a default horizon.`;
 
 function buildUserPrompt(transcript: string, explainLevel: ExplainLevel) {
   return `Analyze this transcript and return only valid JSON with this shape:
@@ -46,6 +47,9 @@ Hard rules:
 - Use simple Swedish for every non-enum text field.
 - Prefer one mention unless the transcript clearly discusses several stocks.
 - Keep thesis, reasoning, arguments, risks, and catalysts very short.
+- Set time_horizon from what the video says or strongly implies, including between-the-lines clues such as "before earnings", "today", "soon", "short term", "long term", "next week", or "over the coming year".
+- Use a concrete Swedish horizon like "1 dag", "2 veckor", "3-6 månader", "inför rapporten", "kortsiktigt", or "långsiktigt" when supported.
+- If the horizon is not supported by the transcript, set time_horizon to null. Never default to 1 month.
 - If the transcript does not support a clear stock signal, use INSUFFICIENT_DATA.
 
 Transcript:

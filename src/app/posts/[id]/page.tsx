@@ -28,6 +28,7 @@ export default async function PostPage({ params, searchParams }: { params: Promi
   const checked = firstParam(rawParams.checked) || "0";
   const updated = firstParam(rawParams.updated) || "0";
   const pending = firstParam(rawParams.pending) || "0";
+  const skipped = firstParam(rawParams.skipped) || "0";
   const noData = firstParam(rawParams.noData) || "0";
   const failed = firstParam(rawParams.failed) || "0";
   const outcomeErrors = (firstParam(rawParams.errors) || "").split(" | ").filter(Boolean);
@@ -70,7 +71,7 @@ export default async function PostPage({ params, searchParams }: { params: Promi
           ) : null}
           {outcomeStatus ? (
             <div className={`mt-4 rounded border p-3 text-sm ${Number(failed) > 0 ? "border-amber-200 bg-amber-50 text-amber-950" : "border-emerald-200 bg-emerald-50 text-emerald-950"}`}>
-              <p>Uppföljning klar: kontrollerade {checked}, uppdaterade {updated}, väntar {pending}, ingen data {noData}, misslyckade {failed}.</p>
+              <p>Uppföljning klar: kontrollerade {checked}, uppdaterade {updated}, väntar {pending}, ignorerade {skipped}, ingen data {noData}, misslyckade {failed}.</p>
               {outcomeErrors.length ? <p className="mt-2 font-medium">Felorsak: {outcomeErrors.join(" / ")}</p> : null}
             </div>
           ) : null}
