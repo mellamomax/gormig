@@ -5,8 +5,10 @@ import { FilterForm, ManualScrapeForm, ManualTranscriptForm } from "@/components
 import { AccuracySummary, OutcomeList, OutcomeUpdateForm } from "@/components/outcomes";
 import { PaperTradingPanel } from "@/components/paper-trading";
 import { PostList } from "@/components/post-list";
+import { ReliabilityDots } from "@/components/reliability-dots";
 import { canUseDatabase, getAccuracyOverview, getDashboardStats, getPaperTradingOverview, listDashboardPosts, listOutcomeEvaluations } from "@/lib/data";
 import { addDays, inferHorizonDays, toDateOnly } from "@/lib/market/horizon";
+import { buildHorizonDecision, buildPositionSize, buildReliability } from "@/lib/decision";
 import { hasOpenAIConfig } from "@/lib/openai/client";
 import { defaultSummary, getHeadline, getSummaryMap } from "@/lib/summary";
 import type { DashboardPost, Mention, OutcomeEvaluation, PaperTradingSettings, Signal } from "@/lib/types";
@@ -20,6 +22,9 @@ type ActionItem = {
   targetDate: string | null;
   daysLeft: number | null;
   priority: number;
+  horizon: ReturnType<typeof buildHorizonDecision>;
+  position: ReturnType<typeof buildPositionSize>;
+  reliability: ReturnType<typeof buildReliability>;
 };
 
 function normalizeParams(input: Record<string, string | string[] | undefined>) {
@@ -31,14 +36,6 @@ function normalizeParams(input: Record<string, string | string[] | undefined>) {
 function formatShortDate(value: string | null) {
   if (!value) return "Oklar";
   return new Intl.DateTimeFormat("sv-SE", { month: "short", day: "numeric" }).format(new Date(value));
-}
-
-function horizonStatus(item: ActionItem) {
-  if (item.daysLeft === null) return "Oklar horisont";
-  if (item.daysLeft < 0) return "Bör följas upp";
-  if (item.daysLeft === 0) return "Idag";
-  if (item.daysLeft === 1) return "Imorgon";
-  return `${item.daysLeft} dagar kvar`;
 }
 
 function actionMeta(action: Signal["action"]) {
@@ -96,6 +93,13 @@ function riskLabel(risk: Signal["risk_level"] | undefined) {
   return "Risk oklar";
 }
 
+function positionTone(tone: ReturnType<typeof buildPositionSize>["tone"]) {
+  if (tone === "strong") return "bg-emerald-600 text-white";
+  if (tone === "good") return "bg-teal-600 text-white";
+  if (tone === "caution") return "bg-amber-500 text-white";
+  return "bg-slate-200 text-slate-800";
+}
+
 function signalPriority(signal: Signal, daysLeft: number | null) {
   const actionScore = signal.action === "BUY_CANDIDATE" ? 0 : signal.action === "WATCH" ? 2 : signal.action === "REDUCE" || signal.action === "AVOID" ? 4 : 6;
   const timeScore = daysLeft === null ? 5 : daysLeft < 0 ? 1 : daysLeft <= 7 ? 0 : daysLeft <= 30 ? 2 : 4;
@@ -123,6 +127,10 @@ function buildActionItems(posts: DashboardPost[], outcomes: OutcomeEvaluation[])
 
         if (daysLeft !== null && daysLeft < -10) continue;
 
+        const decisionInput = { mention, signal, publishedAt: post.published_at, createdAt: post.created_at };
+        const reliability = buildReliability(decisionInput);
+        const position = buildPositionSize(decisionInput);
+
         items.push({
           post,
           mention,
@@ -131,7 +139,10 @@ function buildActionItems(posts: DashboardPost[], outcomes: OutcomeEvaluation[])
           summary: defaultSummary(getSummaryMap(post)),
           targetDate,
           daysLeft,
-          priority: signalPriority(signal, daysLeft),
+          priority: signalPriority(signal, daysLeft) + (5 - reliability.score),
+          horizon: buildHorizonDecision(decisionInput),
+          position,
+          reliability,
         });
       }
     }
@@ -190,27 +201,35 @@ function LeadAction({ item }: { item: ActionItem }) {
           <h2 className="mt-3 text-3xl font-black tracking-normal">{item.mention.ticker || item.mention.company_name}</h2>
           <p className="mt-1 text-base font-semibold">{meta.verb} · {item.mention.company_name}</p>
         </div>
-        <div className="rounded-lg bg-white/75 p-2.5 text-right shadow-sm">
-          <div className="text-xs font-semibold uppercase text-slate-500">Horisont</div>
-          <div className="mt-1 text-lg font-black">{horizonStatus(item)}</div>
-          <div className="mt-1 text-xs text-slate-600">{formatShortDate(item.targetDate)}</div>
+        <div className="grid gap-2 rounded-lg bg-white/75 p-2.5 text-right shadow-sm">
+          <div>
+            <div className="text-xs font-semibold uppercase text-slate-500">Storlek</div>
+            <div className={`mt-1 inline-flex rounded px-2 py-1 text-sm font-black ${positionTone(item.position.tone)}`}>{item.position.label} · {item.position.percent}%</div>
+          </div>
+          <ReliabilityDots compact score={item.reliability.score} label={item.reliability.label} />
         </div>
       </div>
 
-      <div className="mt-3 grid gap-2 sm:grid-cols-3">
+      <div className="mt-3 grid gap-2 sm:grid-cols-4">
+        <Pill label="Beslut" value={item.position.label === "Ingen" ? "Vänta" : "Agera nu"} />
+        <Pill label="Horisont" value={item.horizon.bucket} />
         <Pill label="Risk" value={riskLabel(item.signal.risk_level)} />
         <Pill label="Confidence" value={`${Math.round(item.signal.confidence * 100)}%`} />
-        <Pill label="Publicerad" value={formatShortDate(item.post.published_at || item.post.created_at)} />
       </div>
 
-      <p className="mt-3 max-w-3xl truncate text-base font-semibold">{item.headline}</p>
+      <div className="mt-3 rounded-lg bg-white/70 p-3">
+        <p className="text-sm font-black">{item.horizon.headline}</p>
+        <p className="mt-1 text-sm leading-6 opacity-85">{item.horizon.detail}</p>
+      </div>
+
+      <p className="mt-3 max-w-3xl truncate text-base font-semibold">Varför: {item.headline}</p>
       <p className="mt-1 max-w-3xl truncate text-sm opacity-80">{item.summary}</p>
 
       <div className="mt-4 flex flex-wrap items-center gap-3">
         <Link className="inline-flex h-9 items-center gap-2 rounded-lg bg-[#071d19] px-3 text-sm font-bold !text-white shadow-sm" href={`/posts/${item.post.id}`}>
           Öppna analys <ArrowRight size={16} />
         </Link>
-        <span className="text-sm font-semibold">Tid: {item.mention.time_horizon || "oklar"}</span>
+        <span className="text-sm font-semibold">Uppföljning: {item.targetDate ? formatShortDate(item.targetDate) : "oklar"}</span>
       </div>
     </article>
   );
@@ -223,9 +242,12 @@ function MiniAction({ item }: { item: ActionItem }) {
       <span className={`rounded px-2 py-1 text-xs font-bold uppercase ${meta.badge}`}>{meta.label}</span>
       <span className="min-w-0">
         <span className="block truncate font-bold">{item.mention.ticker || item.mention.company_name}</span>
-        <span className="block truncate text-sm text-slate-600">{item.headline}</span>
+        <span className="block truncate text-sm text-slate-600">{item.horizon.headline} · {item.position.label} {item.position.percent}%</span>
       </span>
-      <span className="text-right text-xs font-bold text-slate-600">{horizonStatus(item)}</span>
+      <span className="grid justify-items-end gap-1 text-right text-xs font-bold text-slate-600">
+        <span>{item.horizon.bucket}</span>
+        <ReliabilityDots compact score={item.reliability.score} />
+      </span>
     </Link>
   );
 }

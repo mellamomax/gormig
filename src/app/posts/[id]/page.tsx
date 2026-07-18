@@ -4,9 +4,11 @@ import { ArrowLeft, ExternalLink } from "lucide-react";
 import { analyzePostAction, transcribePostAction } from "@/app/actions";
 import { RiskBadge, SignalBadge, StatusBadge } from "@/components/badges";
 import { OutcomeUpdateForm } from "@/components/outcomes";
+import { ReliabilityDots } from "@/components/reliability-dots";
 import { SubmitButton } from "@/components/submit-button";
 import { SummaryLevelSwitcher } from "@/components/summary-level-switcher";
 import { canUseDatabase, getPostWithAnalysis, listOutcomeEvaluations } from "@/lib/data";
+import { buildHorizonDecision, buildPositionSize, buildReliability } from "@/lib/decision";
 import { getHeadline, getMentionedStockLabel, getSummaryMap } from "@/lib/summary";
 
 function formatDate(value: string | null) {
@@ -40,8 +42,11 @@ function expectationText(company: string, action?: string) {
   return "Ingen tydlig förväntan";
 }
 
-function horizonText(value: string | null) {
-  return value || "Oklar - följs inte automatiskt";
+function positionTone(tone: ReturnType<typeof buildPositionSize>["tone"]) {
+  if (tone === "strong") return "bg-emerald-600 text-white";
+  if (tone === "good") return "bg-teal-600 text-white";
+  if (tone === "caution") return "bg-amber-500 text-white";
+  return "bg-slate-200 text-slate-800";
 }
 
 export default async function PostPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams?: Promise<Record<string, string | string[] | undefined>> }) {
@@ -117,6 +122,10 @@ export default async function PostPage({ params, searchParams }: { params: Promi
           {(post.mentions || []).map((mention) => {
             const signal = mention.signals?.[0];
             const outcome = signal ? outcomes.find((item) => item.signal_id === signal.id) : null;
+            const decisionInput = { mention, signal, publishedAt: post.published_at, createdAt: post.created_at };
+            const horizon = buildHorizonDecision(decisionInput);
+            const position = buildPositionSize(decisionInput);
+            const reliability = buildReliability(decisionInput);
             return (
               <article key={mention.id} className="rounded border border-[var(--line)] bg-[var(--panel)] p-5">
                 <div className="flex flex-wrap items-center justify-between gap-3">
@@ -131,17 +140,29 @@ export default async function PostPage({ params, searchParams }: { params: Promi
                     <RiskBadge risk={signal?.risk_level} />
                   </div>
                 </div>
-                <div className="mt-4 grid gap-3 md:grid-cols-2">
+                <div className="mt-4 grid gap-3 md:grid-cols-4">
                   <div className="rounded border border-[var(--line)] bg-[var(--panel-2)] p-3">
-                    <div className="text-xs font-semibold uppercase text-slate-500">Förväntan</div>
+                    <div className="text-xs font-semibold uppercase text-slate-500">Beslut</div>
                     <div className="mt-1 text-lg font-semibold">{expectationText(mention.company_name, signal?.action)}</div>
                   </div>
                   <div className="rounded border border-[var(--line)] bg-[var(--panel-2)] p-3">
                     <div className="text-xs font-semibold uppercase text-slate-500">Tidshorisont</div>
-                    <div className="mt-1 text-lg font-semibold">{horizonText(mention.time_horizon)}</div>
+                    <div className="mt-1 text-lg font-semibold">{horizon.headline}</div>
+                  </div>
+                  <div className="rounded border border-[var(--line)] bg-[var(--panel-2)] p-3">
+                    <div className="text-xs font-semibold uppercase text-slate-500">Fiktiv storlek</div>
+                    <div className={`mt-1 inline-flex rounded px-2 py-1 text-sm font-black ${positionTone(position.tone)}`}>{position.label} · {position.percent}%</div>
+                  </div>
+                  <div className="rounded border border-[var(--line)] bg-[var(--panel-2)] p-3">
+                    <div className="text-xs font-semibold uppercase text-slate-500">Verifierat</div>
+                    <div className="mt-2"><ReliabilityDots score={reliability.score} label={reliability.label} /></div>
                   </div>
                 </div>
-                <p className="mt-4 text-sm leading-6 text-slate-700">{mention.thesis}</p>
+                <div className="mt-3 rounded border border-[var(--line)] bg-white p-3 text-sm leading-6 text-slate-700">
+                  <p className="font-semibold text-[var(--foreground)]">{horizon.detail}</p>
+                  <p className="mt-1">{position.detail}</p>
+                </div>
+                <p className="mt-4 text-sm leading-6 text-slate-700"><span className="font-semibold">Varför:</span> {mention.thesis}</p>
                 {signal ? <p className="mt-3 rounded bg-[var(--panel-2)] p-3 text-sm leading-6 text-slate-700">{signal.reasoning}</p> : null}
                 {outcome ? (
                   <div className="mt-3 rounded border border-[var(--line)] p-3 text-sm text-slate-700">
@@ -151,10 +172,11 @@ export default async function PostPage({ params, searchParams }: { params: Promi
                 ) : null}
                 <details className="mt-4 rounded border border-[var(--line)] p-3">
                   <summary className="cursor-pointer text-sm font-semibold">Visa underlag</summary>
-                  <div className="mt-4 grid gap-4 md:grid-cols-3">
+                  <div className="mt-4 grid gap-4 md:grid-cols-4">
                     <List title="Argument" items={mention.arguments} />
                     <List title="Risker" items={mention.risks} />
                     <List title="Katalysatorer" items={mention.catalysts} />
+                    <List title="Verifiering" items={[...reliability.evidence, `Framtida källor: ${reliability.futureSources.join(", ")}`]} />
                   </div>
                 </details>
               </article>
