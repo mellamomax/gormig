@@ -1,5 +1,6 @@
-﻿import { FileText, Play, Search, SlidersHorizontal } from "lucide-react";
+import { FileText, Search, SlidersHorizontal } from "lucide-react";
 import { addManualTranscriptAction, scrapePostsAction } from "@/app/actions";
+import { SubmitButton } from "@/components/submit-button";
 
 export function FilterForm({ params }: { params: Record<string, string> }) {
   return (

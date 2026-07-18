@@ -1,8 +1,9 @@
-﻿import Link from "next/link";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, ExternalLink } from "lucide-react";
 import { analyzePostAction, transcribePostAction } from "@/app/actions";
 import { RiskBadge, SignalBadge, StatusBadge } from "@/components/badges";
+import { SubmitButton } from "@/components/submit-button";
 import { canUseDatabase, getPostWithAnalysis } from "@/lib/data";
 
 function formatDate(value: string | null) {
@@ -36,13 +37,13 @@ export default async function PostPage({ params }: { params: Promise<{ id: strin
             {post.media_url && !post.transcript ? (
               <form action={transcribePostAction}>
                 <input type="hidden" name="postId" value={post.id} />
-                <button className="rounded bg-[var(--accent)] px-3 py-2 text-sm font-semibold text-white" type="submit">Transkribera</button>
+                <SubmitButton label="Transkribera" pendingLabel="Transkriberar..." tone="accent" className="px-3" />
               </form>
             ) : null}
             {post.transcript ? (
               <form action={analyzePostAction}>
                 <input type="hidden" name="postId" value={post.id} />
-                <button className="rounded bg-[var(--foreground)] px-3 py-2 text-sm font-semibold text-white" type="submit">Analysera igen</button>
+                <SubmitButton label="Analysera igen" pendingLabel="Analyserar..." className="px-3" />
               </form>
             ) : null}
           </div>
