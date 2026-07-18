@@ -40,6 +40,22 @@ function outcomeReportUrl(postId: string | undefined, report: Awaited<ReturnType
   return postId ? `/posts/${postId}?${params}` : `/?tab=outcomes&${params}`;
 }
 
+function scrapeErrorUrl(error: unknown) {
+  const message = encodeURIComponent(getErrorMessage(error).slice(0, 500));
+  return `/?tab=scrape&scrapeError=1&scrapeMessage=${message}`;
+}
+
+function scrapeReportUrl(report: Awaited<ReturnType<typeof scrapeLatestPosts>>) {
+  const params = new URLSearchParams({
+    tab: "scrape",
+    scrapeStatus: "1",
+    found: String(report.found),
+    inserted: String(report.inserted),
+    skipped: String(report.skipped),
+  });
+  return `/?${params}`;
+}
+
 export async function addManualTranscriptAction(formData: FormData) {
   const transcript = getString(formData, "transcript");
   if (!transcript) throw new Error("Transkription saknas.");
@@ -79,8 +95,17 @@ export async function transcribePostAction(formData: FormData) {
 
 export async function scrapePostsAction(formData: FormData) {
   const limit = Number(getString(formData, "limit") || "5");
-  await scrapeLatestPosts(limit);
-  revalidatePath("/");
+  let report: Awaited<ReturnType<typeof scrapeLatestPosts>>;
+
+  try {
+    report = await scrapeLatestPosts(limit);
+    revalidatePath("/");
+  } catch (error) {
+    console.error("Manual scrape failed", { limit, message: getErrorMessage(error) });
+    redirect(scrapeErrorUrl(error));
+  }
+
+  redirect(scrapeReportUrl(report));
 }
 
 export async function updateOutcomesAction(formData: FormData) {

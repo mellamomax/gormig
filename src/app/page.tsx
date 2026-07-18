@@ -265,6 +265,22 @@ function OutcomeResultPanel({ params }: { params: Record<string, string> }) {
   );
 }
 
+function ScrapeErrorPanel({ message }: { message: string }) {
+  return (
+    <section className="rounded border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-950">
+      Scrape kunde inte köras. Fel: {message || "Okänt fel"}
+    </section>
+  );
+}
+
+function ScrapeResultPanel({ params }: { params: Record<string, string> }) {
+  return (
+    <section className="rounded border border-emerald-200 bg-emerald-50 p-4 text-sm leading-6 text-emerald-950">
+      Scrape klar: hittade {params.found || "0"}, nya {params.inserted || "0"}, redan sparade {params.skipped || "0"}.
+    </section>
+  );
+}
+
 function SetupPanel() {
   return (
     <section className="rounded border border-amber-200 bg-amber-50 p-4 text-amber-950">
@@ -328,6 +344,8 @@ export default async function Home({ searchParams }: { searchParams?: Promise<Re
         {!hasDb ? <SetupPanel /> : null}
         {params.outcomeError ? <OutcomeErrorPanel message={params.outcomeMessage || "Okänt fel"} /> : null}
         {params.outcomeStatus ? <OutcomeResultPanel params={params} /> : null}
+        {params.scrapeError ? <ScrapeErrorPanel message={params.scrapeMessage || "Okänt fel"} /> : null}
+        {params.scrapeStatus ? <ScrapeResultPanel params={params} /> : null}
         <DashboardTabs active={activeTab} />
 
         {activeTab === "overview" ? (
