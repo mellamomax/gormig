@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ExternalLink } from "lucide-react";
 import { analyzePostAction, transcribePostAction } from "@/app/actions";
 import { RiskBadge, SignalBadge, StatusBadge } from "@/components/badges";
+import { ExplainLevelSelect } from "@/components/explain-level-select";
 import { SubmitButton } from "@/components/submit-button";
 import type { DashboardPost } from "@/lib/types";
 
@@ -59,8 +60,9 @@ export function PostList({ posts }: { posts: DashboardPost[] }) {
                 </form>
               ) : null}
               {post.transcript ? (
-                <form action={analyzePostAction}>
+                <form action={analyzePostAction} className="grid gap-2">
                   <input type="hidden" name="postId" value={post.id} />
+                  <ExplainLevelSelect compact />
                   <SubmitButton label="Analysera" pendingLabel="Analyserar..." className="px-3" />
                 </form>
               ) : null}

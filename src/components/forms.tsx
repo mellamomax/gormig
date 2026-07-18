@@ -1,5 +1,6 @@
 import { FileText, Search, SlidersHorizontal } from "lucide-react";
 import { addManualTranscriptAction, scrapePostsAction } from "@/app/actions";
+import { ExplainLevelSelect } from "@/components/explain-level-select";
 import { SubmitButton } from "@/components/submit-button";
 
 export function FilterForm({ params }: { params: Record<string, string> }) {
@@ -77,6 +78,7 @@ export function ManualTranscriptForm() {
         Transkription
         <textarea className="min-h-44 resize-y rounded border border-[var(--line)] px-3 py-2 leading-6" name="transcript" required placeholder="Klistra in videons transkriberade text hÃ¤r" />
       </label>
+      <ExplainLevelSelect />
       <label className="flex items-center gap-2 text-sm text-slate-700">
         <input name="analyzeNow" value="yes" type="checkbox" />
         Analysera direkt med OpenAI

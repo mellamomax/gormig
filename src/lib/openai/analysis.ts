@@ -1,14 +1,15 @@
-﻿import { analysisResponseSchema, type AnalysisResponse } from "@/lib/schemas";
+import { DEFAULT_EXPLAIN_LEVEL, getExplainLevelPrompt, type ExplainLevel } from "@/lib/explain-level";
+import { analysisResponseSchema, type AnalysisResponse } from "@/lib/schemas";
 import { getAnalysisModel, getOpenAIClient } from "./client";
 
 const SYSTEM_PROMPT = `You analyze TikTok transcripts for a private investing research dashboard.
 Return Swedish explanations but keep enum values exactly as specified.
 This is research support, not financial advice. Never present conclusions as certain predictions.
-Only identify companies, tickers, exchanges, thesis, arguments, risks, catalysts, price levels, time horizon, confidence, and a cautious signal.
+Keep answers short by default. Only mention what is actually supported by the transcript.
 Signal actions allowed: BUY_CANDIDATE, WATCH, HOLD, REDUCE, AVOID, INSUFFICIENT_DATA.
 Every signal must include concrete reasoning and risk_level.`;
 
-function buildUserPrompt(transcript: string) {
+function buildUserPrompt(transcript: string, explainLevel: ExplainLevel) {
   return `Analyze this transcript and return only valid JSON with this shape:
 {
   "summary": "short Swedish summary",
@@ -38,11 +39,20 @@ function buildUserPrompt(transcript: string) {
   "no_mention_reason": "string or null"
 }
 
+Style level:
+${getExplainLevelPrompt(explainLevel)}
+
+Hard rules:
+- Use simple Swedish for every non-enum text field.
+- Prefer one mention unless the transcript clearly discusses several stocks.
+- Keep thesis, reasoning, arguments, risks, and catalysts very short.
+- If the transcript does not support a clear stock signal, use INSUFFICIENT_DATA.
+
 Transcript:
 ${transcript}`;
 }
 
-export async function analyzeTranscript(transcript: string): Promise<AnalysisResponse> {
+export async function analyzeTranscript(transcript: string, explainLevel: ExplainLevel = DEFAULT_EXPLAIN_LEVEL): Promise<AnalysisResponse> {
   if (!transcript.trim()) throw new Error("Transcript is empty.");
 
   const client = getOpenAIClient();
@@ -55,7 +65,7 @@ export async function analyzeTranscript(transcript: string): Promise<AnalysisRes
       response_format: { type: "json_object" },
       messages: [
         { role: "system", content: SYSTEM_PROMPT },
-        { role: "user", content: buildUserPrompt(transcript) },
+        { role: "user", content: buildUserPrompt(transcript, explainLevel) },
       ],
     });
 

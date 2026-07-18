@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { ArrowLeft, ExternalLink } from "lucide-react";
 import { analyzePostAction, transcribePostAction } from "@/app/actions";
 import { RiskBadge, SignalBadge, StatusBadge } from "@/components/badges";
+import { ExplainLevelSelect } from "@/components/explain-level-select";
 import { OutcomeUpdateForm } from "@/components/outcomes";
 import { SubmitButton } from "@/components/submit-button";
 import { canUseDatabase, getPostWithAnalysis, listOutcomeEvaluations } from "@/lib/data";
@@ -43,8 +44,9 @@ export default async function PostPage({ params }: { params: Promise<{ id: strin
               </form>
             ) : null}
             {post.transcript ? (
-              <form action={analyzePostAction}>
+              <form action={analyzePostAction} className="flex flex-wrap items-end gap-2">
                 <input type="hidden" name="postId" value={post.id} />
+                <ExplainLevelSelect compact />
                 <SubmitButton label="Analysera igen" pendingLabel="Analyserar..." className="px-3" />
               </form>
             ) : null}

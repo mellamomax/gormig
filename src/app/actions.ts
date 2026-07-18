@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createManualTranscriptPost } from "@/lib/data";
+import { parseExplainLevel } from "@/lib/explain-level";
 import { analyzePost, scrapeLatestPosts, transcribePost } from "@/lib/jobs/manual-runs";
 import { updateOutcomeEvaluations } from "@/lib/jobs/outcomes";
 import { generateTitleFromTranscript } from "@/lib/title";
@@ -26,7 +27,7 @@ export async function addManualTranscriptAction(formData: FormData) {
   });
 
   if (getString(formData, "analyzeNow") === "yes") {
-    await analyzePost(post.id);
+    await analyzePost(post.id, parseExplainLevel(getString(formData, "explainLevel")));
   }
 
   revalidatePath("/");
@@ -36,7 +37,7 @@ export async function addManualTranscriptAction(formData: FormData) {
 export async function analyzePostAction(formData: FormData) {
   const postId = getString(formData, "postId");
   if (!postId) throw new Error("Post id saknas.");
-  await analyzePost(postId);
+  await analyzePost(postId, parseExplainLevel(getString(formData, "explainLevel")));
   revalidatePath("/");
   revalidatePath(`/posts/${postId}`);
 }

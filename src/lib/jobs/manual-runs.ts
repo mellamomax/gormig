@@ -1,4 +1,5 @@
-﻿import { analyzeTranscript } from "@/lib/openai/analysis";
+import { DEFAULT_EXPLAIN_LEVEL, type ExplainLevel } from "@/lib/explain-level";
+import { analyzeTranscript } from "@/lib/openai/analysis";
 import { transcribeMediaUrl } from "@/lib/openai/transcribe";
 import { ApifyTikTokSource } from "@/lib/sources/apify-tiktok";
 import {
@@ -14,15 +15,15 @@ import {
 import { getEnv } from "@/lib/env";
 import { getErrorMessage } from "@/lib/errors";
 
-export async function analyzePost(postId: string) {
+export async function analyzePost(postId: string, explainLevel: ExplainLevel = DEFAULT_EXPLAIN_LEVEL) {
   const post = await getPostWithAnalysis(postId);
   if (!post.transcript) throw new Error("Post has no transcript to analyze.");
 
   await setPostStatus(postId, "processing");
   try {
-    const analysis = await analyzeTranscript(post.transcript);
+    const analysis = await analyzeTranscript(post.transcript, explainLevel);
     await replacePostAnalysis(postId, analysis);
-    await writeRunLog("manual_analysis", "completed", { postId, mentions: analysis.mentions.length });
+    await writeRunLog("manual_analysis", "completed", { postId, explainLevel, mentions: analysis.mentions.length });
     return analysis;
   } catch (error) {
     await setPostStatus(postId, "failed", getErrorMessage(error));
