@@ -2,7 +2,6 @@ import Link from "next/link";
 import { BarChart3, RefreshCw } from "lucide-react";
 import { updateOutcomesAction } from "@/app/actions";
 import { SubmitButton } from "@/components/submit-button";
-import { hasMarketDataConfig } from "@/lib/market/alpha-vantage";
 import type { Mention, OutcomeEvaluation, Post, Signal } from "@/lib/types";
 
 function formatPct(value: number | string | null | undefined) {
@@ -26,17 +25,6 @@ function verdictLabel(verdict: OutcomeEvaluation["verdict"]) {
 }
 
 export function OutcomeUpdateForm({ postId }: { postId?: string }) {
-  if (!hasMarketDataConfig()) {
-    return (
-      <div className="grid gap-2">
-        <button className="inline-flex h-10 cursor-not-allowed items-center justify-center gap-2 rounded bg-slate-200 px-4 text-sm font-semibold text-slate-500" type="button" disabled>
-          Marknadsdata saknas
-        </button>
-        <p className="text-sm leading-6 text-slate-600">Lägg till <span className="mono">ALPHA_VANTAGE_API_KEY</span> i Vercel för faktisk uppföljning.</p>
-      </div>
-    );
-  }
-
   return (
     <form action={updateOutcomesAction}>
       {postId ? <input type="hidden" name="postId" value={postId} /> : null}

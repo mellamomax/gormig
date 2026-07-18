@@ -1,10 +1,9 @@
-import { Activity, Database, ShieldCheck, TrendingUp } from "lucide-react";
+import { Activity, Database, ShieldCheck } from "lucide-react";
 import { DashboardTabs } from "@/components/dashboard-tabs";
 import { FilterForm, ManualScrapeForm, ManualTranscriptForm } from "@/components/forms";
 import { AccuracySummary, OutcomeList, OutcomeUpdateForm } from "@/components/outcomes";
 import { PostList } from "@/components/post-list";
 import { canUseDatabase, getAccuracyOverview, getDashboardStats, listDashboardPosts, listOutcomeEvaluations } from "@/lib/data";
-import { hasMarketDataConfig } from "@/lib/market/alpha-vantage";
 import { hasOpenAIConfig } from "@/lib/openai/client";
 
 function normalizeParams(input: Record<string, string | string[] | undefined>) {
@@ -25,7 +24,7 @@ function Stat({ label, value }: { label: string; value: string | number }) {
 function OutcomeErrorPanel() {
   return (
     <section className="rounded border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-950">
-      Uppföljning kunde inte köras eftersom marknadsdata saknas. Lägg till <span className="mono">ALPHA_VANTAGE_API_KEY</span> i Vercel först.
+      Uppföljning kunde inte hämta marknadsdata. Kontrollera att <span className="mono">ALPHA_VANTAGE_API_KEY</span> finns i Vercel för Production och redeploya sedan.
     </section>
   );
 }
@@ -72,7 +71,6 @@ export default async function Home({ searchParams }: { searchParams?: Promise<Re
             <span className="inline-flex items-center gap-1"><ShieldCheck size={14} /> Cron av</span>
             <span className="inline-flex items-center gap-1"><Database size={14} /> {hasDb ? "Supabase redo" : "Supabase saknas"}</span>
             <span className="inline-flex items-center gap-1"><Activity size={14} /> {hasOpenAIConfig() ? "OpenAI redo" : "OpenAI saknas"}</span>
-            <span className="inline-flex items-center gap-1"><TrendingUp size={14} /> {hasMarketDataConfig() ? "Marknadsdata redo" : "Marknadsdata saknas"}</span>
           </div>
         </div>
       </header>

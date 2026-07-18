@@ -54,7 +54,7 @@ export default async function PostPage({ params, searchParams }: { params: Promi
             ) : null}
           </div>
           {outcomeError === "market-data" ? (
-            <p className="mt-4 rounded border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">Uppföljning kunde inte köras eftersom marknadsdata saknas. Lägg till <span className="mono">ALPHA_VANTAGE_API_KEY</span> i Vercel först.</p>
+            <p className="mt-4 rounded border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">Uppföljning kunde inte hämta marknadsdata. Kontrollera att <span className="mono">ALPHA_VANTAGE_API_KEY</span> finns i Vercel för Production och redeploya sedan.</p>
           ) : null}
           {(post.mentions || []).some((mention) => (mention.signals || []).length > 0) ? (
             <div className="mt-4"><OutcomeUpdateForm postId={post.id} /></div>
