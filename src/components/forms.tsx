@@ -7,7 +7,7 @@ export function FilterForm({ params }: { params: Record<string, string> }) {
   return (
     <form className="grid gap-3 rounded border border-[var(--line)] bg-[var(--panel)] p-4 md:grid-cols-[1.4fr_1fr_1fr_1fr_auto]" action="/">
       <label className="flex flex-col gap-1 text-sm font-medium">
-        SÃ¶k
+        Sök
         <div className="flex items-center gap-2 rounded border border-[var(--line)] px-3 py-2">
           <Search size={16} />
           <input className="w-full bg-transparent outline-none" name="search" defaultValue={params.search || ""} placeholder="Bolag, ticker eller text" />
@@ -58,11 +58,11 @@ export function ManualTranscriptForm() {
     <form action={addManualTranscriptAction} className="grid gap-4 rounded border border-[var(--line)] bg-[var(--panel)] p-4">
       <div className="flex items-center gap-2">
         <FileText size={18} />
-        <h2 className="text-base font-semibold">LÃ¤gg till transkriberad video manuellt</h2>
+        <h2 className="text-base font-semibold">Lägg till transkriberad video manuellt</h2>
       </div>
       <div className="grid gap-3 md:grid-cols-2">
         <label className="flex flex-col gap-1 text-sm font-medium">
-          TikTok-lÃ¤nk eller valfri referens
+          TikTok-länk eller valfri referens
           <input className="rounded border border-[var(--line)] px-3 py-2" name="url" placeholder="https://www.tiktok.com/@stockrobber/video/..." />
         </label>
         <label className="flex flex-col gap-1 text-sm font-medium">
@@ -76,7 +76,7 @@ export function ManualTranscriptForm() {
       </label>
       <label className="flex flex-col gap-1 text-sm font-medium">
         Transkription
-        <textarea className="min-h-44 resize-y rounded border border-[var(--line)] px-3 py-2 leading-6" name="transcript" required placeholder="Klistra in videons transkriberade text hÃ¤r" />
+        <textarea className="min-h-44 resize-y rounded border border-[var(--line)] px-3 py-2 leading-6" name="transcript" required placeholder="Klistra in videons transkriberade text här" />
       </label>
       <ExplainLevelSelect />
       <label className="flex items-center gap-2 text-sm text-slate-700">
@@ -95,7 +95,7 @@ export function ManualScrapeForm() {
         <Search size={18} />
         <h2 className="text-base font-semibold">Manuell scrape/backfill</h2>
       </div>
-      <p className="text-sm leading-6 text-slate-600">Inget kÃ¶rs automatiskt. VÃ¤lj sjÃ¤lv hur mÃ¥nga senaste videos appen fÃ¥r frÃ¥ga scraperkÃ¤llan efter.</p>
+      <p className="text-sm leading-6 text-slate-600">Inget körs automatiskt. Välj själv hur många senaste videos appen får fråga scraperkällan efter.</p>
       <label className="flex max-w-xs flex-col gap-1 text-sm font-medium">
         Antal videos att kontrollera
         <input className="rounded border border-[var(--line)] px-3 py-2" name="limit" type="number" min="1" max="50" defaultValue="5" />

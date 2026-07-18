@@ -13,7 +13,15 @@ Time horizon is critical for follow-up accuracy: infer it from explicit wording 
 function buildUserPrompt(transcript: string, explainLevel: ExplainLevel) {
   return `Analyze this transcript and return only valid JSON with this shape:
 {
-  "summary": "short Swedish summary",
+  "summary": "short Swedish summary for age 10",
+  "headline": "very short Swedish subtitle, max 8 words",
+  "summary_by_level": {
+    "3": "summary for a 3 year old",
+    "5": "summary for a 5 year old",
+    "10": "summary for a 10 year old",
+    "20": "summary for a 20 year old",
+    "expert": "summary for an investing expert"
+  },
   "mentions": [
     {
       "company_name": "string",
@@ -47,6 +55,8 @@ Hard rules:
 - Use simple Swedish for every non-enum text field.
 - Prefer one mention unless the transcript clearly discusses several stocks.
 - Keep thesis, reasoning, arguments, risks, and catalysts very short.
+- Always fill summary_by_level for all five levels. These summaries will be saved and switched in the UI without rerunning analysis.
+- Make headline sound like a compact subtitle for a video list, for example "Atlas Copco är på gång".
 - Set time_horizon from what the video says or strongly implies, including between-the-lines clues such as "before earnings", "today", "soon", "short term", "long term", "next week", or "over the coming year".
 - Use a concrete Swedish horizon like "1 dag", "2 veckor", "3-6 månader", "inför rapporten", "kortsiktigt", or "långsiktigt" when supported.
 - If the horizon is not supported by the transcript, set time_horizon to null. Never default to 1 month.

@@ -1,4 +1,4 @@
-﻿import { z } from "zod";
+import { z } from "zod";
 
 export const signalActionSchema = z.enum([
   "BUY_CANDIDATE",
@@ -11,6 +11,14 @@ export const signalActionSchema = z.enum([
 
 export const sentimentSchema = z.enum(["positive", "negative", "neutral"]);
 export const riskLevelSchema = z.enum(["low", "medium", "high", "unknown"]);
+
+export const analysisSummaryByLevelSchema = z.object({
+  "3": z.string().min(1),
+  "5": z.string().min(1),
+  "10": z.string().min(1),
+  "20": z.string().min(1),
+  expert: z.string().min(1),
+});
 
 export const analysisSignalSchema = z.object({
   action: signalActionSchema,
@@ -38,6 +46,8 @@ export const analysisMentionSchema = z.object({
 
 export const analysisResponseSchema = z.object({
   summary: z.string().min(1),
+  headline: z.string().min(1).optional(),
+  summary_by_level: analysisSummaryByLevelSchema.optional(),
   mentions: z.array(analysisMentionSchema),
   no_mention_reason: z.string().nullable().optional(),
 });

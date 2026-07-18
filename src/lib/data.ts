@@ -1,5 +1,6 @@
 import { createHash } from "crypto";
 import { getSupabaseAdmin, hasSupabaseConfig } from "@/lib/supabase/server";
+import { EXPLAIN_LEVELS } from "@/lib/explain-level";
 import type { AnalysisResponse } from "@/lib/schemas";
 import type { Creator, DashboardPost, Mention, OutcomeEvaluation, Post, Signal, SourcePost } from "@/lib/types";
 
@@ -218,8 +219,25 @@ export async function setPostStatus(postId: string, status: Post["processing_sta
   if (error) throw new Error(error.message);
 }
 
+function analysisMetadata(analysis: AnalysisResponse) {
+  const summary = analysis.summary.trim();
+  const summaryByLevel = Object.fromEntries(
+    EXPLAIN_LEVELS.map((level) => [level, analysis.summary_by_level?.[level]?.trim() || summary]),
+  );
+
+  return {
+    analysis_summary: summary,
+    analysis_summary_by_level: summaryByLevel,
+    analysis_headline: analysis.headline?.trim() || summary,
+    analysis_updated_at: new Date().toISOString(),
+  };
+}
+
 export async function replacePostAnalysis(postId: string, analysis: AnalysisResponse) {
   const supabase = getSupabaseAdmin();
+  const { data: existingPost, error: postError } = await supabase.from("posts").select("raw_metadata").eq("id", postId).single();
+  if (postError) throw new Error(postError.message);
+
   const { error: deleteError } = await supabase.from("mentions").delete().eq("post_id", postId);
   if (deleteError) throw new Error(deleteError.message);
 
@@ -258,7 +276,17 @@ export async function replacePostAnalysis(postId: string, analysis: AnalysisResp
     if (signalError) throw new Error(signalError.message);
   }
 
-  await setPostStatus(postId, "analyzed");
+  const rawMetadata = ((existingPost as Pick<Post, "raw_metadata"> | null)?.raw_metadata || {}) as Record<string, unknown>;
+  const { error: updateError } = await supabase
+    .from("posts")
+    .update({
+      processing_status: "analyzed",
+      processing_error: null,
+      raw_metadata: { ...rawMetadata, ...analysisMetadata(analysis) },
+    })
+    .eq("id", postId);
+
+  if (updateError) throw new Error(updateError.message);
 }
 
 export async function tryAcquireLock(key: string, holdSeconds = 300) {
