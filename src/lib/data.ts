@@ -1,7 +1,7 @@
 import { createHash } from "crypto";
 import { getSupabaseAdmin, hasSupabaseConfig } from "@/lib/supabase/server";
 import type { AnalysisResponse } from "@/lib/schemas";
-import type { Creator, DashboardPost, Mention, Post, Signal, SourcePost } from "@/lib/types";
+import type { Creator, DashboardPost, Mention, OutcomeEvaluation, Post, Signal, SourcePost } from "@/lib/types";
 
 const DEFAULT_USERNAME = process.env.TIKTOK_USERNAME || "stockrobber";
 const DEFAULT_PROFILE_URL = `https://www.tiktok.com/@${DEFAULT_USERNAME}`;
@@ -279,4 +279,90 @@ export async function releaseLock(key: string) {
 export async function writeRunLog(runType: string, status: string, report: Record<string, unknown>) {
   const { error } = await getSupabaseAdmin().from("run_logs").insert({ run_type: runType, status, report });
   if (error) throw new Error(error.message);
+}
+export async function listOutcomeEvaluations() {
+  if (!canUseDatabase()) return [] as Array<OutcomeEvaluation & { signals?: Signal; mentions?: Mention; posts?: Post }>;
+
+  const { data, error } = await getSupabaseAdmin()
+    .from("outcome_evaluations")
+    .select("*, signals(*), mentions(*), posts(*)")
+    .order("evaluated_at", { ascending: false })
+    .limit(200);
+
+  if (error) {
+    if (error.message.includes("outcome_evaluations")) return [] as Array<OutcomeEvaluation & { signals?: Signal; mentions?: Mention; posts?: Post }>;
+    throw new Error(error.message);
+  }
+  return (data || []) as unknown as Array<OutcomeEvaluation & { signals?: Signal; mentions?: Mention; posts?: Post }>;
+}
+
+export async function getAccuracyOverview() {
+  const outcomes = await listOutcomeEvaluations();
+  const completed = outcomes.filter((outcome) => outcome.is_success !== null && outcome.verdict !== "IGNORED");
+  const successes = completed.filter((outcome) => outcome.is_success).length;
+  const averageReturn = completed.length
+    ? completed.reduce((sum, outcome) => sum + Number(outcome.return_pct || 0), 0) / completed.length
+    : 0;
+
+  return {
+    outcomes: outcomes.length,
+    completed: completed.length,
+    pending: outcomes.filter((outcome) => outcome.verdict === "PENDING").length,
+    noData: outcomes.filter((outcome) => outcome.verdict === "NO_DATA").length,
+    successes,
+    hitRate: completed.length ? successes / completed.length : null,
+    averageReturn,
+  };
+}
+
+export async function listSignalsForOutcomeUpdate(postId?: string) {
+  const supabase = getSupabaseAdmin();
+  let query = supabase
+    .from("signals")
+    .select("*, outcome_evaluations(*), mentions(*, posts(*))")
+    .order("generated_at", { ascending: false });
+
+  const { data, error } = await query;
+  if (error) throw new Error(error.message);
+
+  const rows = (data || []) as unknown as Array<Signal & { outcome_evaluations?: OutcomeEvaluation[]; mentions?: Mention & { posts?: Post } }>;
+  return rows.filter((signal) => {
+    if (postId && signal.mentions?.post_id !== postId) return false;
+    if (signal.action === "INSUFFICIENT_DATA") return false;
+    return Boolean(signal.mentions?.ticker && signal.mentions?.posts?.published_at);
+  });
+}
+
+export async function upsertOutcomeEvaluation(input: Omit<OutcomeEvaluation, "id" | "created_at" | "evaluated_at">) {
+  const { data, error } = await getSupabaseAdmin()
+    .from("outcome_evaluations")
+    .upsert(
+      {
+        signal_id: input.signal_id,
+        mention_id: input.mention_id,
+        post_id: input.post_id,
+        ticker: input.ticker,
+        exchange: input.exchange,
+        action: input.action,
+        horizon_label: input.horizon_label,
+        horizon_days: input.horizon_days,
+        start_date: input.start_date,
+        target_date: input.target_date,
+        start_price: input.start_price,
+        target_price: input.target_price,
+        return_pct: input.return_pct,
+        is_success: input.is_success,
+        verdict: input.verdict,
+        notes: input.notes,
+        source: input.source,
+        raw_data: input.raw_data,
+        evaluated_at: new Date().toISOString(),
+      },
+      { onConflict: "signal_id" },
+    )
+    .select("*")
+    .single();
+
+  if (error) throw new Error(error.message);
+  return data as OutcomeEvaluation;
 }

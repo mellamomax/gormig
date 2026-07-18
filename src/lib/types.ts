@@ -1,4 +1,4 @@
-﻿export type ProcessingStatus = "new" | "processing" | "transcribed" | "analyzed" | "failed";
+export type ProcessingStatus = "new" | "processing" | "transcribed" | "analyzed" | "failed";
 
 export type Creator = {
   id: string;
@@ -44,10 +44,36 @@ export type Mention = {
   created_at: string;
 };
 
+export type OutcomeEvaluation = {
+  id: string;
+  signal_id: string;
+  mention_id: string;
+  post_id: string;
+  ticker: string;
+  exchange: string | null;
+  action: SignalAction;
+  horizon_label: string | null;
+  horizon_days: number | null;
+  start_date: string | null;
+  target_date: string | null;
+  start_price: number | null;
+  target_price: number | null;
+  return_pct: number | null;
+  is_success: boolean | null;
+  verdict: "PENDING" | "NO_DATA" | "POSITIVE_HIT" | "NEGATIVE_HIT" | "NEUTRAL_HIT" | "MISS" | "IGNORED";
+  notes: string | null;
+  source: string;
+  raw_data: Record<string, unknown>;
+  evaluated_at: string;
+  created_at: string;
+};
+
+export type SignalAction = "BUY_CANDIDATE" | "WATCH" | "HOLD" | "REDUCE" | "AVOID" | "INSUFFICIENT_DATA";
+
 export type Signal = {
   id: string;
   mention_id: string;
-  action: "BUY_CANDIDATE" | "WATCH" | "HOLD" | "REDUCE" | "AVOID" | "INSUFFICIENT_DATA";
+  action: SignalAction;
   reasoning: string;
   entry_condition: string | null;
   invalidation_condition: string | null;
@@ -70,5 +96,5 @@ export type SourcePost = {
 
 export type DashboardPost = Post & {
   creator?: Pick<Creator, "username" | "profile_url"> | null;
-  mentions?: Array<Mention & { signals?: Signal[] }>;
+  mentions?: Array<Mention & { signals?: Array<Signal & { outcome_evaluations?: OutcomeEvaluation[] }> }>;
 };

@@ -1,9 +1,10 @@
-﻿"use server";
+"use server";
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createManualTranscriptPost } from "@/lib/data";
 import { analyzePost, scrapeLatestPosts, transcribePost } from "@/lib/jobs/manual-runs";
+import { updateOutcomeEvaluations } from "@/lib/jobs/outcomes";
 
 function getString(formData: FormData, key: string) {
   const value = formData.get(key);
@@ -49,4 +50,10 @@ export async function scrapePostsAction(formData: FormData) {
   const limit = Number(getString(formData, "limit") || "5");
   await scrapeLatestPosts(limit);
   revalidatePath("/");
+}
+export async function updateOutcomesAction(formData: FormData) {
+  const postId = getString(formData, "postId") || undefined;
+  await updateOutcomeEvaluations(postId);
+  revalidatePath("/");
+  if (postId) revalidatePath(`/posts/${postId}`);
 }

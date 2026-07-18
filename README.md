@@ -1,4 +1,4 @@
-﻿# Stockrobber Agent
+# Stockrobber Agent
 
 Private manual-first web app for monitoring Stockrobber TikTok videos, saving transcripts, and generating structured investment research notes.
 
@@ -72,6 +72,7 @@ OPENAI_API_KEY=...
 OPENAI_ANALYSIS_MODEL=gpt-4o-mini
 OPENAI_TRANSCRIBE_MODEL=gpt-4o-mini-transcribe
 TIKTOK_USERNAME=stockrobber
+ALPHA_VANTAGE_API_KEY=
 ```
 
 Only add these when you want scraper testing:
@@ -103,6 +104,18 @@ npm run dev
 ```
 
 Fill `.env.local` with the same values as Vercel when testing locally.
+
+## Follow-up accuracy tracking
+
+The dashboard has an “Uppföljning” tab. It compares each saved signal against actual daily close prices once the signal time horizon has passed.
+
+Current market-data adapter: Alpha Vantage `TIME_SERIES_DAILY`.
+
+- Add `ALPHA_VANTAGE_API_KEY` in Vercel to enable it.
+- The app only runs follow-up when you press the button.
+- `INSUFFICIENT_DATA` signals are ignored.
+- Future target dates are saved as pending.
+- Results are research QA only, not trading advice.
 
 ## Manual test flow
 

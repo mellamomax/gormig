@@ -3,8 +3,9 @@ import { notFound } from "next/navigation";
 import { ArrowLeft, ExternalLink } from "lucide-react";
 import { analyzePostAction, transcribePostAction } from "@/app/actions";
 import { RiskBadge, SignalBadge, StatusBadge } from "@/components/badges";
+import { OutcomeUpdateForm } from "@/components/outcomes";
 import { SubmitButton } from "@/components/submit-button";
-import { canUseDatabase, getPostWithAnalysis } from "@/lib/data";
+import { canUseDatabase, getPostWithAnalysis, listOutcomeEvaluations } from "@/lib/data";
 
 function formatDate(value: string | null) {
   if (!value) return "Datum saknas";
@@ -16,6 +17,7 @@ export default async function PostPage({ params }: { params: Promise<{ id: strin
   const { id } = await params;
   const post = await getPostWithAnalysis(id);
   if (!post) notFound();
+  const outcomes = (await listOutcomeEvaluations()).filter((outcome) => outcome.post_id === post.id);
 
   return (
     <main className="min-h-screen bg-[var(--background)]">
@@ -32,7 +34,7 @@ export default async function PostPage({ params }: { params: Promise<{ id: strin
           <h1 className="mt-3 text-2xl font-bold">{post.caption || "Video utan caption"}</h1>
           <div className="mt-4 flex flex-wrap gap-2">
             <Link className="inline-flex items-center gap-2 rounded border border-[var(--line)] px-3 py-2 text-sm font-medium" href={post.url} target="_blank">
-              <ExternalLink size={15} /> Öppna TikTok
+              <ExternalLink size={15} /> Ãƒâ€“ppna TikTok
             </Link>
             {post.media_url && !post.transcript ? (
               <form action={transcribePostAction}>
@@ -47,19 +49,23 @@ export default async function PostPage({ params }: { params: Promise<{ id: strin
               </form>
             ) : null}
           </div>
+          {(post.mentions || []).some((mention) => (mention.signals || []).length > 0) ? (
+            <div className="mt-4"><OutcomeUpdateForm postId={post.id} /></div>
+          ) : null}
           {post.processing_error ? <p className="mt-4 rounded border border-red-200 bg-red-50 p-3 text-sm text-red-900">{post.processing_error}</p> : null}
         </section>
 
         <section className="rounded border border-[var(--line)] bg-[var(--panel)] p-5">
           <h2 className="text-lg font-semibold">Transkription</h2>
-          <p className="mt-3 whitespace-pre-wrap text-sm leading-7 text-slate-700">{post.transcript || "Ingen transkription ännu."}</p>
+          <p className="mt-3 whitespace-pre-wrap text-sm leading-7 text-slate-700">{post.transcript || "Ingen transkription ÃƒÂ¤nnu."}</p>
         </section>
 
         <section className="grid gap-3">
           <h2 className="text-lg font-semibold">Analys</h2>
-          {(post.mentions || []).length === 0 ? <p className="rounded border border-dashed border-[var(--line)] bg-[var(--panel)] p-5 text-sm text-slate-600">Ingen analys sparad ännu.</p> : null}
+          {(post.mentions || []).length === 0 ? <p className="rounded border border-dashed border-[var(--line)] bg-[var(--panel)] p-5 text-sm text-slate-600">Ingen analys sparad ÃƒÂ¤nnu.</p> : null}
           {(post.mentions || []).map((mention) => {
             const signal = mention.signals?.[0];
+            const outcome = signal ? outcomes.find((item) => item.signal_id === signal.id) : null;
             return (
               <article key={mention.id} className="rounded border border-[var(--line)] bg-[var(--panel)] p-5">
                 <div className="flex flex-wrap items-center justify-between gap-3">
@@ -67,7 +73,7 @@ export default async function PostPage({ params }: { params: Promise<{ id: strin
                     <Link className="text-xl font-semibold hover:text-[var(--accent)]" href={`/stocks/${encodeURIComponent(mention.ticker || mention.company_name)}`}>
                       {mention.company_name} {mention.ticker ? <span className="text-slate-500">({mention.ticker})</span> : null}
                     </Link>
-                    <p className="mt-1 text-sm text-slate-500">{mention.exchange || "Börs saknas"} · sentiment {mention.sentiment} · confidence {Math.round(mention.confidence * 100)}%</p>
+                    <p className="mt-1 text-sm text-slate-500">{mention.exchange || "BÃƒÂ¶rs saknas"} Ã‚Â· sentiment {mention.sentiment} Ã‚Â· confidence {Math.round(mention.confidence * 100)}%</p>
                   </div>
                   <div className="grid justify-items-start gap-1 sm:justify-items-end">
                     <SignalBadge signal={signal} />
@@ -81,6 +87,12 @@ export default async function PostPage({ params }: { params: Promise<{ id: strin
                   <List title="Katalysatorer" items={mention.catalysts} />
                 </div>
                 {signal ? <p className="mt-4 rounded bg-[var(--panel-2)] p-3 text-sm leading-6 text-slate-700">{signal.reasoning}</p> : null}
+                {signal?.outcome_evaluations?.[0] ? (
+                  <div className="mt-3 rounded border border-[var(--line)] p-3 text-sm text-slate-700">
+                    <div className="font-semibold">UppfÃ¶ljning: {signal.outcome_evaluations[0].verdict}</div>
+                    <div className="mt-1">{signal.outcome_evaluations[0].notes}</div>
+                  </div>
+                ) : null}
               </article>
             );
           })}
@@ -96,7 +108,7 @@ function List({ title, items }: { title: string; items: string[] }) {
       <h3 className="text-sm font-semibold">{title}</h3>
       {items.length === 0 ? <p className="mt-2 text-sm text-slate-500">Saknas</p> : null}
       <ul className="mt-2 grid gap-2 text-sm leading-6 text-slate-700">
-        {items.map((item) => <li key={item}>• {item}</li>)}
+        {items.map((item) => <li key={item}>Ã¢â‚¬Â¢ {item}</li>)}
       </ul>
     </div>
   );
