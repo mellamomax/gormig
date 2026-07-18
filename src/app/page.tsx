@@ -21,10 +21,10 @@ function Stat({ label, value }: { label: string; value: string | number }) {
   );
 }
 
-function OutcomeErrorPanel() {
+function OutcomeErrorPanel({ message }: { message: string }) {
   return (
     <section className="rounded border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-950">
-      Uppföljning kunde inte hämta marknadsdata. Kontrollera att <span className="mono">ALPHA_VANTAGE_API_KEY</span> finns i Vercel för Production och redeploya sedan.
+      Uppföljning kunde inte köras. Fel: {message || "Okänt fel"}
     </section>
   );
 }
@@ -77,7 +77,7 @@ export default async function Home({ searchParams }: { searchParams?: Promise<Re
 
       <div className="mx-auto grid max-w-7xl gap-4 px-5 py-4">
         {!hasDb ? <SetupPanel /> : null}
-        {params.outcomeError === "market-data" ? <OutcomeErrorPanel /> : null}
+        {params.outcomeError ? <OutcomeErrorPanel message={params.outcomeMessage || "Okänt fel"} /> : null}
         <DashboardTabs active={activeTab} />
 
         {activeTab === "overview" ? (

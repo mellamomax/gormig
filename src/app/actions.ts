@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createManualTranscriptPost } from "@/lib/data";
 import { parseExplainLevel } from "@/lib/explain-level";
+import { getErrorMessage } from "@/lib/errors";
 import { analyzePost, scrapeLatestPosts, transcribePost } from "@/lib/jobs/manual-runs";
 import { updateOutcomeEvaluations } from "@/lib/jobs/outcomes";
 import { generateTitleFromTranscript } from "@/lib/title";
@@ -11,6 +12,13 @@ import { generateTitleFromTranscript } from "@/lib/title";
 function getString(formData: FormData, key: string) {
   const value = formData.get(key);
   return typeof value === "string" ? value.trim() : "";
+}
+
+function outcomeErrorUrl(postId: string | undefined, error: unknown) {
+  const message = encodeURIComponent(getErrorMessage(error).slice(0, 500));
+  return postId
+    ? `/posts/${postId}?outcomeError=1&outcomeMessage=${message}`
+    : `/?tab=outcomes&outcomeError=1&outcomeMessage=${message}`;
 }
 
 export async function addManualTranscriptAction(formData: FormData) {
@@ -62,7 +70,8 @@ export async function updateOutcomesAction(formData: FormData) {
     await updateOutcomeEvaluations(postId);
     revalidatePath("/");
     if (postId) revalidatePath(`/posts/${postId}`);
-  } catch {
-    redirect(postId ? `/posts/${postId}?outcomeError=market-data` : "/?tab=outcomes&outcomeError=market-data");
+  } catch (error) {
+    console.error("Outcome update failed", { postId, message: getErrorMessage(error) });
+    redirect(outcomeErrorUrl(postId, error));
   }
 }
