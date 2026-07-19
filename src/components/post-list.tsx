@@ -42,7 +42,7 @@ export function PostList({ posts }: { posts: DashboardPost[] }) {
   }
 
   return (
-    <section className="rounded border border-[var(--line)] bg-[var(--panel)]">
+    <section className="app-post-list rounded border border-[var(--line)] bg-[var(--panel)]">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[var(--line)] bg-[var(--panel-2)] px-3 py-2">
         <div className="text-sm font-bold">{posts.length} videos</div>
         <div className="flex flex-wrap items-center gap-2">
@@ -75,7 +75,7 @@ export function PostList({ posts }: { posts: DashboardPost[] }) {
           </div>
         ) : null}
         <div className="overflow-x-auto">
-          <div className={`grid min-w-[58rem] ${editing ? "grid-cols-[3rem_6rem_8rem_minmax(12rem,1.2fr)_5rem_8rem_minmax(13rem,1fr)]" : "grid-cols-[6rem_8rem_minmax(12rem,1.2fr)_5rem_8rem_minmax(13rem,1fr)]"} gap-3 border-b border-[var(--line)] bg-[var(--panel-2)] px-3 py-2 text-xs font-semibold uppercase text-slate-500`}>
+          <div className={`app-post-list-header grid min-w-[58rem] ${editing ? "grid-cols-[3rem_6rem_8rem_minmax(12rem,1.2fr)_5rem_8rem_minmax(13rem,1fr)]" : "grid-cols-[6rem_8rem_minmax(12rem,1.2fr)_5rem_8rem_minmax(13rem,1fr)]"} gap-3 border-b border-[var(--line)] bg-[var(--panel-2)] px-3 py-2 text-xs font-semibold uppercase text-slate-500`}>
             {editing ? <span>Välj</span> : null}
             <span>Datum</span>
             <span>Kategori</span>
@@ -87,7 +87,7 @@ export function PostList({ posts }: { posts: DashboardPost[] }) {
           {posts.map((post) => {
             const signal = getPrimarySignal(post);
             const summary = defaultSummary(getSummaryMap(post));
-            const rowClass = `grid min-w-[58rem] ${editing ? "grid-cols-[3rem_6rem_8rem_minmax(12rem,1.2fr)_5rem_8rem_minmax(13rem,1fr)]" : "grid-cols-[6rem_8rem_minmax(12rem,1.2fr)_5rem_8rem_minmax(13rem,1fr)]"} gap-3 border-b border-[var(--line)] px-3 py-2 text-sm last:border-b-0 hover:bg-[var(--panel-2)]`;
+            const rowClass = `app-post-list-row grid min-w-[58rem] ${editing ? "grid-cols-[3rem_6rem_8rem_minmax(12rem,1.2fr)_5rem_8rem_minmax(13rem,1fr)]" : "grid-cols-[6rem_8rem_minmax(12rem,1.2fr)_5rem_8rem_minmax(13rem,1fr)]"} gap-3 border-b border-[var(--line)] px-3 py-2 text-sm last:border-b-0 hover:bg-[var(--panel-2)]`;
             const rowContent = (
               <>
                 <span className="text-slate-500">{formatDate(post.published_at || post.created_at)}</span>

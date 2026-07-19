@@ -5,7 +5,7 @@ import { addDays, inferHorizonDays, toDateOnly } from "@/lib/market/horizon";
 import { classifySourcePost } from "@/lib/relevance";
 import type { AnalysisResponse } from "@/lib/schemas";
 import { extractTikTokVideoId } from "@/lib/tiktok";
-import type { Creator, DashboardPost, Mention, OutcomeEvaluation, PaperTrade, PaperTradingSettings, Post, Signal, SourcePost } from "@/lib/types";
+import type { Creator, DashboardPost, FollowUpEvent, Mention, OutcomeEvaluation, PaperTrade, PaperTradingSettings, Post, Signal, SourcePost } from "@/lib/types";
 
 const DEFAULT_USERNAME = process.env.TIKTOK_USERNAME || "stockrobber";
 const DEFAULT_PROFILE_URL = `https://www.tiktok.com/@${DEFAULT_USERNAME}`;
@@ -694,6 +694,57 @@ export async function listOutcomeEvaluations() {
     throw new Error(error.message);
   }
   return (data || []) as unknown as Array<OutcomeEvaluation & { signals?: Signal; mentions?: Mention; posts?: Post }>;
+}
+
+function followUpEventsTableMissing(error: { message?: string } | null) {
+  return Boolean(error?.message?.includes("follow_up_events"));
+}
+
+export async function listRecentFollowUpEvents(limit = 8): Promise<FollowUpEvent[]> {
+  if (!canUseDatabase()) return [];
+
+  const { data, error } = await getSupabaseAdmin()
+    .from("follow_up_events")
+    .select("*")
+    .order("observed_at", { ascending: false })
+    .order("created_at", { ascending: false })
+    .limit(limit);
+
+  if (error) {
+    if (followUpEventsTableMissing(error)) return [];
+    throw new Error(error.message);
+  }
+
+  return (data || []) as FollowUpEvent[];
+}
+
+export async function upsertFollowUpEvent(input: Omit<FollowUpEvent, "id" | "created_at">) {
+  const { data, error } = await getSupabaseAdmin()
+    .from("follow_up_events")
+    .upsert(
+      {
+        signal_id: input.signal_id,
+        mention_id: input.mention_id,
+        post_id: input.post_id,
+        ticker: input.ticker,
+        company_name: input.company_name,
+        event_type: input.event_type,
+        severity: input.severity,
+        title: input.title,
+        summary: input.summary,
+        source: input.source,
+        source_url: input.source_url,
+        observed_at: input.observed_at,
+        unique_event_key: input.unique_event_key,
+        raw_data: input.raw_data,
+      },
+      { onConflict: "unique_event_key", ignoreDuplicates: true },
+    )
+    .select("*")
+    .maybeSingle();
+
+  if (error) throw new Error(error.message);
+  return data as FollowUpEvent | null;
 }
 
 export async function getAccuracyOverview() {

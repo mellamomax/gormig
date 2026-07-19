@@ -68,6 +68,25 @@ export type OutcomeEvaluation = {
   created_at: string;
 };
 
+export type FollowUpEvent = {
+  id: string;
+  signal_id: string | null;
+  mention_id: string | null;
+  post_id: string | null;
+  ticker: string;
+  company_name: string | null;
+  event_type: "price_move" | "news" | "outcome" | "system";
+  severity: "info" | "watch" | "important";
+  title: string;
+  summary: string;
+  source: string;
+  source_url: string | null;
+  observed_at: string;
+  unique_event_key: string;
+  raw_data: Record<string, unknown>;
+  created_at: string;
+};
+
 export type SignalAction = "BUY_CANDIDATE" | "WATCH" | "HOLD" | "REDUCE" | "AVOID" | "INSUFFICIENT_DATA";
 export type PaperTradingSettings = {
   id: boolean;

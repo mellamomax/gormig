@@ -4,7 +4,7 @@ import { fetchDailyPrices, findPriceOnOrAfter, hasMarketDataConfig } from "@/lib
 import { addDays, inferHorizonDays, toDateOnly } from "@/lib/market/horizon";
 import type { OutcomeEvaluation, SignalAction } from "@/lib/types";
 
-function normalizeSymbol(ticker: string, exchange?: string | null) {
+export function normalizeSymbol(ticker: string, exchange?: string | null) {
   const cleanTicker = ticker.trim().toUpperCase();
   const cleanExchange = (exchange || "").trim().toUpperCase();
   if (!cleanExchange) return cleanTicker;
@@ -50,12 +50,13 @@ function classifyOutcome(action: SignalAction, returnPct: number) {
   return { isSuccess: null, verdict: "IGNORED" as const };
 }
 
-export async function updateOutcomeEvaluations(postId?: string) {
+export async function updateOutcomeEvaluations(postId?: string, maxSignals?: number) {
   if (!hasMarketDataConfig()) {
     throw new Error("ALPHA_VANTAGE_API_KEY saknas. Lägg till den i Vercel för automatisk kursuppföljning.");
   }
 
-  const signals = await listSignalsForOutcomeUpdate(postId);
+  const allSignals = await listSignalsForOutcomeUpdate(postId);
+  const signals = maxSignals ? allSignals.slice(0, Math.max(1, maxSignals)) : allSignals;
   const report = { checked: signals.length, updated: 0, pending: 0, skipped: 0, noData: 0, failed: 0, errors: [] as string[] };
   const priceCache = new Map<string, Awaited<ReturnType<typeof fetchDailyPrices>>>();
 

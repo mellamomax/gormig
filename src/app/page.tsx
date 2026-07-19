@@ -1,17 +1,18 @@
 import Link from "next/link";
 import { Activity, ArrowRight, CheckCircle2, Clock3, Database, ShieldCheck } from "lucide-react";
 import { DashboardTabs } from "@/components/dashboard-tabs";
+import { FollowUpFeed } from "@/components/follow-up-feed";
 import { FilterForm, ManualScrapeForm, ManualTranscriptForm } from "@/components/forms";
 import { AccuracySummary, OutcomeList, OutcomeUpdateForm } from "@/components/outcomes";
 import { PaperTradingPanel } from "@/components/paper-trading";
 import { PostList } from "@/components/post-list";
 import { ReliabilityDots } from "@/components/reliability-dots";
-import { canUseDatabase, getAccuracyOverview, getDashboardStats, getPaperTradingOverview, listDashboardPosts, listOutcomeEvaluations } from "@/lib/data";
+import { canUseDatabase, getAccuracyOverview, getDashboardStats, getPaperTradingOverview, listDashboardPosts, listOutcomeEvaluations, listRecentFollowUpEvents } from "@/lib/data";
 import { addDays, inferHorizonDays, toDateOnly } from "@/lib/market/horizon";
 import { buildHorizonDecision, buildPositionSize, buildReliability } from "@/lib/decision";
 import { hasOpenAIConfig } from "@/lib/openai/client";
 import { defaultSummary, getHeadline, getSummaryMap } from "@/lib/summary";
-import type { DashboardPost, Mention, OutcomeEvaluation, PaperTradingSettings, Signal } from "@/lib/types";
+import type { DashboardPost, FollowUpEvent, Mention, OutcomeEvaluation, PaperTradingSettings, Signal } from "@/lib/types";
 
 type ActionItem = {
   post: DashboardPost;
@@ -359,22 +360,24 @@ export default async function Home({ searchParams }: { searchParams?: Promise<Re
   let stats: Awaited<ReturnType<typeof getDashboardStats>> = { posts: 0, analyzed: 0, failed: 0, mentions: 0, buyCandidates: 0 };
   let accuracy: Awaited<ReturnType<typeof getAccuracyOverview>> = { outcomes: 0, completed: 0, pending: 0, noData: 0, successes: 0, hitRate: null, averageReturn: 0 };
   let outcomes: Awaited<ReturnType<typeof listOutcomeEvaluations>> = [];
+  let followUps: FollowUpEvent[] = [];
   let paper = paperFallback();
 
   if (hasDb) {
-    [posts, stats, accuracy, outcomes, paper] = await Promise.all([
+    [posts, stats, accuracy, outcomes, paper, followUps] = await Promise.all([
       listDashboardPosts(params),
       getDashboardStats(),
       getAccuracyOverview(),
       listOutcomeEvaluations(),
       getPaperTradingOverview(),
+      listRecentFollowUpEvents(8),
     ]);
   }
 
   const actionItems = buildActionItems(posts, outcomes);
   return (
-    <main className="min-h-screen bg-[var(--background)]">
-      <header className="border-b border-[var(--line)] bg-[var(--panel)]">
+    <main className="app-shell min-h-screen bg-[var(--background)]">
+      <header className="app-header border-b border-[var(--line)] bg-[var(--panel)]">
         <div className="mx-auto grid max-w-7xl gap-2 px-4 py-3 md:grid-cols-[1fr_auto] md:items-center">
           <div>
             <p className="text-xs font-bold uppercase tracking-normal text-[var(--accent)]">Privat beslutsdashboard</p>
@@ -388,7 +391,7 @@ export default async function Home({ searchParams }: { searchParams?: Promise<Re
         </div>
       </header>
 
-      <div className="mx-auto grid max-w-7xl gap-3 px-4 py-3">
+      <div className="app-content mx-auto grid max-w-7xl gap-3 px-4 py-3">
         {!hasDb ? <SetupPanel /> : null}
         {params.outcomeError ? <OutcomeErrorPanel message={params.outcomeMessage || "Okänt fel"} /> : null}
         {params.outcomeStatus ? <OutcomeResultPanel params={params} /> : null}
@@ -407,6 +410,7 @@ export default async function Home({ searchParams }: { searchParams?: Promise<Re
                 <Stat label="Träff" value={accuracy.hitRate === null ? "-" : `${Math.round(accuracy.hitRate * 100)}%`} tone={accuracy.hitRate !== null && accuracy.hitRate >= 0.5 ? "good" : undefined} />
                 <Stat label="Väntar" value={accuracy.pending} />
               </div>
+              <FollowUpFeed events={followUps} />
               <PaperTradingPanel overview={paper} compact />
               <div className="flex items-center justify-between gap-3 rounded-lg border border-[var(--line)] bg-[var(--panel)] p-3 shadow-sm">
                 <div className="min-w-0">
