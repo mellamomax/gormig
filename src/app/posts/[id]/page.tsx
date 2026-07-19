@@ -91,7 +91,7 @@ export default async function PostPage({ params, searchParams }: { params: Promi
             <Link className="inline-flex items-center gap-2 rounded border border-[var(--line)] px-3 py-2 text-sm font-medium" href={post.url} target="_blank">
               <ExternalLink size={15} /> Öppna TikTok
             </Link>
-            {post.processing_status !== "analyzed" && (post.media_url || post.transcript) ? (
+            {post.processing_status !== "analyzed" ? (
               <form action={processPostAction}>
                 <input type="hidden" name="postId" value={post.id} />
                 <SubmitButton label={post.transcript ? "Analysera video" : "Transkribera + analysera"} pendingLabel="Bearbetar..." tone="accent" className="px-3" />
@@ -104,11 +104,6 @@ export default async function PostPage({ params, searchParams }: { params: Promi
               </form>
             ) : null}
           </div>
-          {!post.media_url && !post.transcript ? (
-            <p className="mt-4 rounded border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">
-              Videon saknar transkription och hämtbar media-URL. Lägg in transkriptionen manuellt för att analysera den.
-            </p>
-          ) : null}
           {outcomeError ? (
             <p className="mt-4 rounded border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">Uppföljning kunde inte köras. Fel: {outcomeMessage || "Okänt fel"}</p>
           ) : null}

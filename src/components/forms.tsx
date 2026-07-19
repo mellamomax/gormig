@@ -95,7 +95,7 @@ export function ManualScrapeForm() {
         <Search size={18} />
         <h2 className="text-base font-semibold">Manuell scrape/backfill</h2>
       </div>
-      <p className="text-sm leading-6 text-slate-600">Hämtar senaste TikTok-posterna via Apify. Nya videos transkriberas och analyseras direkt om video-URL finns.</p>
+      <p className="text-sm leading-6 text-slate-600">Hämtar senaste TikTok-posterna via Apify. Nya videos skickas till transcript-actorn och analyseras direkt.</p>
       <label className="flex max-w-xs flex-col gap-1 text-sm font-medium">
         Antal videos att kontrollera
         <input className="rounded border border-[var(--line)] px-3 py-2" name="limit" type="number" min="1" max="50" defaultValue="5" />

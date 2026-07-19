@@ -1,6 +1,7 @@
 import { DEFAULT_EXPLAIN_LEVEL, type ExplainLevel } from "@/lib/explain-level";
 import { analyzeTranscript } from "@/lib/openai/analysis";
 import { transcribeMediaUrl } from "@/lib/openai/transcribe";
+import { transcribeTikTokUrl } from "@/lib/sources/apify-transcript";
 import { ApifyTikTokSource } from "@/lib/sources/apify-tiktok";
 import {
   getPostWithAnalysis,
@@ -34,11 +35,19 @@ export async function analyzePost(postId: string, explainLevel: ExplainLevel = D
 
 export async function transcribePost(postId: string) {
   const post = await getPostWithAnalysis(postId);
-  if (!post.media_url) throw new Error("Post has no media URL to transcribe.");
 
   await setPostStatus(postId, "processing");
   try {
-    const transcript = await transcribeMediaUrl(post.media_url);
+    const transcript = getEnv("APIFY_TRANSCRIPT_ACTOR_ID")
+      ? await transcribeTikTokUrl(post.url)
+      : post.media_url
+        ? await transcribeMediaUrl(post.media_url)
+        : null;
+
+    if (!transcript) {
+      throw new Error("APIFY_TRANSCRIPT_ACTOR_ID saknas. Lägg in transcript-actorns id i Vercel för automatisk transkribering.");
+    }
+
     const updated = await updatePostTranscript(postId, transcript);
     await writeRunLog("manual_analysis", "completed", { postId, transcribed: true });
     return updated;
@@ -58,11 +67,16 @@ export async function processPost(postId: string, explainLevel: ExplainLevel = D
     let transcribed = false;
 
     if (!transcript) {
-      if (!post.media_url) {
-        throw new Error("Videon saknar media-URL. Lägg in transkriptionen manuellt eller justera Apify så video-URL följer med.");
+      transcript = getEnv("APIFY_TRANSCRIPT_ACTOR_ID")
+        ? await transcribeTikTokUrl(post.url)
+        : post.media_url
+          ? await transcribeMediaUrl(post.media_url)
+          : null;
+
+      if (!transcript) {
+        throw new Error("APIFY_TRANSCRIPT_ACTOR_ID saknas. Lägg in transcript-actorns id i Vercel för automatisk transkribering.");
       }
 
-      transcript = await transcribeMediaUrl(post.media_url);
       await updatePostTranscript(postId, transcript);
       transcribed = true;
     }
