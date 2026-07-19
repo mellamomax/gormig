@@ -59,14 +59,20 @@ button:disabled {
 @media (max-width: 760px) {
   html {
     background: #f6faf8;
+    max-width: 100%;
+    overflow-x: hidden;
   }
 
   body {
     background: #f6faf8;
+    max-width: 100%;
+    overflow-x: hidden;
     overscroll-behavior-y: none;
   }
 
   .app-shell {
+    max-width: 100%;
+    overflow-x: hidden;
     padding-bottom: calc(5.25rem + env(safe-area-inset-bottom));
   }
 
@@ -86,6 +92,17 @@ button:disabled {
 
   .app-content {
     gap: 0.85rem;
+    max-width: 100%;
+    min-width: 0;
+    overflow-x: hidden;
+  }
+
+  .app-content > *,
+  .app-content section,
+  .app-content article,
+  .app-header > div {
+    max-width: 100%;
+    min-width: 0;
   }
 
   .app-tabs {
@@ -105,6 +122,7 @@ button:disabled {
   .app-tab {
     height: 3.3rem;
     min-width: 0;
+    overflow: hidden;
     flex-direction: column;
     justify-content: center;
     gap: 0.2rem;
@@ -115,8 +133,16 @@ button:disabled {
   }
 
   .app-tab svg {
+    flex: 0 0 auto;
     width: 1.05rem;
     height: 1.05rem;
+  }
+
+  .app-tab-label {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
 
   .app-post-list {
@@ -197,6 +223,15 @@ button:disabled {
     width: 100%;
   }
 
+  .stock-tracker,
+  .stock-tracker > *,
+  .stock-tracker article,
+  .stock-tracker aside,
+  .stock-tracker svg {
+    max-width: 100%;
+    min-width: 0;
+  }
+
   .stock-tracker select {
     min-width: 0;
     flex: 1;
@@ -209,7 +244,7 @@ button:disabled {
   .stock-row {
     grid-template-columns: minmax(0, 1fr) auto !important;
     gap: 0.35rem 0.75rem;
-    margin: 0.65rem;
+    margin: 0.65rem 0;
     border: 1px solid var(--line);
     border-radius: 0.9rem;
     background: white;
@@ -239,5 +274,15 @@ button:disabled {
     order: 5;
     grid-column: 1 / -1;
     font-size: 0.75rem;
+  }
+}
+
+@media (max-width: 390px) {
+  .app-tab {
+    height: 3rem;
+  }
+
+  .app-tab-label {
+    display: none;
   }
 }

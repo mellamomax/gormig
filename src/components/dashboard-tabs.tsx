@@ -25,7 +25,7 @@ export function DashboardTabs({ active }: { active: string }) {
             aria-current={selected ? "page" : undefined}
           >
             <Icon size={16} />
-            {tab.label}
+            <span className="app-tab-label">{tab.label}</span>
           </Link>
         );
       })}
