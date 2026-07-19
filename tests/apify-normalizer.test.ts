@@ -20,6 +20,15 @@ describe("normalizeApifyTikTokItem", () => {
     expect(post?.mediaUrl).toContain("video.mp4");
   });
 
+  it("uses the TikTok video URL id when the actor omits an id", () => {
+    const post = normalizeApifyTikTokItem({
+      webVideoUrl: "https://www.tiktok.com/@stockrobber.com/video/7660541293902318870",
+      text: "Example caption",
+    });
+
+    expect(post?.platformPostId).toBe("7660541293902318870");
+  });
+
   it("ignores items without a URL", () => {
     expect(normalizeApifyTikTokItem({ id: "1" })).toBeNull();
   });

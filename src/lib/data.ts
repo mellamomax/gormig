@@ -3,6 +3,7 @@ import { getSupabaseAdmin, hasSupabaseConfig } from "@/lib/supabase/server";
 import { EXPLAIN_LEVELS } from "@/lib/explain-level";
 import { addDays, inferHorizonDays, toDateOnly } from "@/lib/market/horizon";
 import type { AnalysisResponse } from "@/lib/schemas";
+import { extractTikTokVideoId } from "@/lib/tiktok";
 import type { Creator, DashboardPost, Mention, OutcomeEvaluation, PaperTrade, PaperTradingSettings, Post, Signal, SourcePost } from "@/lib/types";
 
 const DEFAULT_USERNAME = process.env.TIKTOK_USERNAME || "stockrobber";
@@ -275,7 +276,42 @@ export async function createManualTranscriptPost(input: {
   publishedAt?: string;
 }) {
   const creator = await ensureDefaultCreator();
-  const platformPostId = input.url.trim().length > 0 ? `manual:${hashText(input.url)}` : `manual:${hashText(input.transcript)}`;
+  const tiktokVideoId = extractTikTokVideoId(input.url);
+  const platformPostId = tiktokVideoId || (input.url.trim().length > 0 ? `manual:${hashText(input.url)}` : `manual:${hashText(input.transcript)}`);
+
+  if (tiktokVideoId && input.url.trim().length > 0) {
+    const { data: existingByUrl, error: existingByUrlError } = await getSupabaseAdmin()
+      .from("posts")
+      .select("*")
+      .eq("creator_id", creator.id)
+      .eq("url", input.url)
+      .maybeSingle();
+
+    if (existingByUrlError) throw new Error(existingByUrlError.message);
+
+    const existingPost = existingByUrl as Post | null;
+    if (existingPost && existingPost.platform_post_id !== platformPostId) {
+      const rawMetadata = existingPost.raw_metadata || {};
+      const { data, error } = await getSupabaseAdmin()
+        .from("posts")
+        .update({
+          platform_post_id: platformPostId,
+          caption: input.caption || existingPost.caption || null,
+          published_at: input.publishedAt || existingPost.published_at || null,
+          transcript: input.transcript,
+          processing_status: "transcribed",
+          processing_error: null,
+          raw_metadata: { ...rawMetadata, source: "manual_transcript", adopted_platform_post_id: platformPostId },
+        })
+        .eq("id", existingPost.id)
+        .select("*")
+        .single();
+
+      if (error) throw new Error(error.message);
+      return data as Post;
+    }
+  }
+
   const { data, error } = await getSupabaseAdmin()
     .from("posts")
     .upsert(
@@ -302,23 +338,65 @@ export async function createManualTranscriptPost(input: {
 export async function saveSourcePosts(posts: SourcePost[]) {
   const creator = await ensureDefaultCreator();
   if (posts.length === 0) {
-    return { found: 0, inserted: 0, skipped: 0, insertedPostIds: [] as string[] };
+    return { found: 0, inserted: 0, skipped: 0, adopted: 0, insertedPostIds: [] as string[] };
   }
 
   const supabase = getSupabaseAdmin();
-  const ids = posts.map((post) => post.platformPostId);
   const { data: existing, error: existingError } = await supabase
     .from("posts")
-    .select("platform_post_id")
-    .eq("creator_id", creator.id)
-    .in("platform_post_id", ids);
+    .select("id, platform_post_id, url, caption, published_at, cover_url, media_url, duration_seconds, raw_metadata")
+    .eq("creator_id", creator.id);
 
   if (existingError) throw new Error(existingError.message);
-  const existingIds = new Set((existing || []).map((row: { platform_post_id: string }) => row.platform_post_id));
-  const newPosts = posts.filter((post) => !existingIds.has(post.platformPostId));
+  const existingRows = (existing || []) as Array<
+    Pick<Post, "id" | "platform_post_id" | "url" | "caption" | "published_at" | "cover_url" | "media_url" | "duration_seconds" | "raw_metadata">
+  >;
+  const existingByPlatformId = new Map(existingRows.map((row) => [row.platform_post_id, row]));
+  const existingByTikTokId = new Map<string, (typeof existingRows)[number]>();
+
+  for (const row of existingRows) {
+    const tiktokVideoId = extractTikTokVideoId(row.url) || (!row.platform_post_id.startsWith("manual:") ? row.platform_post_id : null);
+    if (tiktokVideoId && !existingByTikTokId.has(tiktokVideoId)) existingByTikTokId.set(tiktokVideoId, row);
+  }
+
+  const newPosts: SourcePost[] = [];
+  let adopted = 0;
+
+  for (const post of posts) {
+    const tiktokVideoId = extractTikTokVideoId(post.url) || post.platformPostId;
+    const existingPost = existingByPlatformId.get(post.platformPostId) || existingByTikTokId.get(tiktokVideoId);
+
+    if (!existingPost) {
+      newPosts.push(post);
+      continue;
+    }
+
+    if (existingPost.platform_post_id !== post.platformPostId) {
+      const rawMetadata = (existingPost.raw_metadata || {}) as Record<string, unknown>;
+      const { error: updateError } = await supabase
+        .from("posts")
+        .update({
+          platform_post_id: post.platformPostId,
+          url: post.url || existingPost.url,
+          caption: existingPost.caption || post.caption || null,
+          published_at: existingPost.published_at || post.publishedAt || null,
+          cover_url: existingPost.cover_url || post.coverUrl || null,
+          media_url: existingPost.media_url || post.mediaUrl || null,
+          duration_seconds: existingPost.duration_seconds || post.durationSeconds || null,
+          raw_metadata: { ...post.rawMetadata, ...rawMetadata, adopted_platform_post_id: post.platformPostId },
+          processing_error: null,
+        })
+        .eq("id", existingPost.id);
+
+      if (updateError) throw new Error(updateError.message);
+      adopted += 1;
+      existingPost.platform_post_id = post.platformPostId;
+      existingByPlatformId.set(post.platformPostId, existingPost);
+    }
+  }
 
   if (newPosts.length === 0) {
-    return { found: posts.length, inserted: 0, skipped: posts.length, insertedPostIds: [] as string[] };
+    return { found: posts.length, inserted: 0, skipped: posts.length - adopted, adopted, insertedPostIds: [] as string[] };
   }
 
   const { data, error } = await supabase
@@ -343,7 +421,8 @@ export async function saveSourcePosts(posts: SourcePost[]) {
   return {
     found: posts.length,
     inserted: newPosts.length,
-    skipped: posts.length - newPosts.length,
+    skipped: posts.length - newPosts.length - adopted,
+    adopted,
     insertedPostIds: (data || []).map((row: { id: string }) => row.id),
   };
 }

@@ -1,5 +1,6 @@
 ﻿import { createHash } from "crypto";
 import { getEnv, requireEnv } from "@/lib/env";
+import { extractTikTokVideoId } from "@/lib/tiktok";
 import type { SourcePost } from "@/lib/types";
 import type { SocialMediaSource } from "./social";
 
@@ -58,12 +59,15 @@ export function normalizeApifyTikTokItem(item: unknown): SourcePost | null {
 
   if (!url) return null;
 
-  const id = firstString(record, [
-    ["id"],
-    ["aweme_id"],
-    ["video", "id"],
-    ["videoId"],
-  ]) || hash(url);
+  const id =
+    firstString(record, [
+      ["id"],
+      ["aweme_id"],
+      ["video", "id"],
+      ["videoId"],
+    ]) ||
+    extractTikTokVideoId(url) ||
+    hash(url);
 
   const created = firstString(record, [
     ["createTimeISO"],

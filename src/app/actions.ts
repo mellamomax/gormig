@@ -52,6 +52,7 @@ function scrapeReportUrl(report: Awaited<ReturnType<typeof scrapeLatestPosts>>) 
     found: String(report.found),
     inserted: String(report.inserted),
     skipped: String(report.skipped),
+    adopted: String(report.adopted),
     processed: String(report.processed),
     processFailed: String(report.processFailed),
   });
