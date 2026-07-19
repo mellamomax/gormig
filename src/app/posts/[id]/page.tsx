@@ -16,6 +16,11 @@ function formatDate(value: string | null) {
   return new Intl.DateTimeFormat("sv-SE", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
 }
 
+function usableWebUrl(value: string | null | undefined) {
+  const trimmed = value?.trim();
+  return trimmed && /^https?:\/\//i.test(trimmed) ? trimmed : null;
+}
+
 function firstParam(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value;
 }
@@ -69,6 +74,14 @@ export default async function PostPage({ params, searchParams }: { params: Promi
   const outcomeErrors = (firstParam(rawParams.errors) || "").split(" | ").filter(Boolean);
   if (!post) notFound();
   const outcomes = (await listOutcomeEvaluations()).filter((outcome) => outcome.post_id === post.id);
+  const webUrl = usableWebUrl(post.url);
+  const processLabel =
+    post.processing_status === "failed"
+      ? "Försök hämta igen"
+      : post.transcript
+        ? "Analysera video"
+        : "Transkribera + analysera";
+  const pendingProcessLabel = post.processing_status === "failed" ? "Hämtar om videon..." : "Bearbetar...";
 
   return (
     <main className="min-h-screen bg-[var(--background)]">
@@ -88,13 +101,23 @@ export default async function PostPage({ params, searchParams }: { params: Promi
             <SummaryLevelSwitcher summaries={getSummaryMap(post)} headline={getHeadline(post)} />
           </div>
           <div className="mt-4 flex flex-wrap gap-2">
-            <Link className="inline-flex items-center gap-2 rounded border border-[var(--line)] px-3 py-2 text-sm font-medium" href={post.url} target="_blank">
-              <ExternalLink size={15} /> Öppna TikTok
-            </Link>
+            {webUrl ? (
+              <Link className="inline-flex items-center gap-2 rounded border border-[var(--line)] px-3 py-2 text-sm font-medium" href={webUrl} target="_blank">
+                <ExternalLink size={15} /> Öppna TikTok
+              </Link>
+            ) : null}
             {post.processing_status !== "analyzed" ? (
-              <form action={processPostAction}>
+              <form action={processPostAction} className="flex flex-wrap items-center gap-2">
                 <input type="hidden" name="postId" value={post.id} />
-                <SubmitButton label={post.transcript ? "Analysera video" : "Transkribera + analysera"} pendingLabel="Bearbetar..." tone="accent" className="px-3" />
+                {!webUrl ? (
+                  <input
+                    className="min-w-[18rem] rounded border border-[var(--line)] px-3 py-2 text-sm"
+                    name="url"
+                    placeholder="Klistra in TikTok-länk om den saknas"
+                    type="url"
+                  />
+                ) : null}
+                <SubmitButton label={processLabel} pendingLabel={pendingProcessLabel} tone="accent" className="px-3" />
               </form>
             ) : null}
             {post.processing_status === "analyzed" && post.transcript ? (
@@ -117,6 +140,11 @@ export default async function PostPage({ params, searchParams }: { params: Promi
             <p className="mt-4 rounded border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">Analys kunde inte köras. Fel: {processMessage || "Okänt fel"}</p>
           ) : null}
           {processStatus ? <p className="mt-4 rounded border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-950">Videon är transkriberad och analyserad.</p> : null}
+          {post.processing_status === "failed" ? (
+            <p className="mt-4 rounded border border-amber-200 bg-amber-50 p-3 text-sm text-amber-950">
+              Klicka på "Försök hämta igen" så testar appen bara den här videon. Om URL saknas men TikTok-ID finns bygger appen om länken automatiskt.
+            </p>
+          ) : null}
           {(post.mentions || []).some((mention) => (mention.signals || []).length > 0) ? (
             <div className="mt-4"><OutcomeUpdateForm postId={post.id} /></div>
           ) : null}

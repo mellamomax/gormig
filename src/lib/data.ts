@@ -538,6 +538,15 @@ export async function updatePostTranscript(postId: string, transcript: string) {
   return data as Post;
 }
 
+export async function updatePostUrl(postId: string, url: string) {
+  const { error } = await getSupabaseAdmin()
+    .from("posts")
+    .update({ url, processing_error: null })
+    .eq("id", postId);
+
+  if (error) throw new Error(error.message);
+}
+
 export async function setPostStatus(postId: string, status: Post["processing_status"], errorMessage?: string | null) {
   const { error } = await getSupabaseAdmin()
     .from("posts")

@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { createManualTranscriptPost, deletePosts, setPaperTradingEnabled } from "@/lib/data";
+import { createManualTranscriptPost, deletePosts, setPaperTradingEnabled, updatePostUrl } from "@/lib/data";
 import { parseExplainLevel } from "@/lib/explain-level";
 import { getErrorMessage } from "@/lib/errors";
 import { analyzePost, processPost, scrapeLatestPosts, transcribePost } from "@/lib/jobs/manual-runs";
@@ -131,8 +131,10 @@ export async function deletePostsAction(formData: FormData) {
 export async function processPostAction(formData: FormData) {
   const postId = getString(formData, "postId");
   if (!postId) throw new Error("Post id saknas.");
+  const url = getString(formData, "url");
 
   try {
+    if (url) await updatePostUrl(postId, url);
     await processPost(postId, parseExplainLevel(getString(formData, "explainLevel")));
     revalidatePath("/");
     revalidatePath(`/posts/${postId}`);

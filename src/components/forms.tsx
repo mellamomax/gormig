@@ -1,6 +1,7 @@
 import { FileText, Search, SlidersHorizontal } from "lucide-react";
 import { addManualTranscriptAction, scrapePostsAction } from "@/app/actions";
 import { ExplainLevelSelect } from "@/components/explain-level-select";
+import { ScrapeProgressOverlay } from "@/components/scrape-progress-overlay";
 import { SubmitButton } from "@/components/submit-button";
 
 export function FilterForm({ params }: { params: Record<string, string> }) {
@@ -100,7 +101,8 @@ export function ManualScrapeForm() {
         Antal videos att kontrollera
         <input className="rounded border border-[var(--line)] px-3 py-2" name="limit" type="number" min="1" max="50" defaultValue="5" />
       </label>
-      <SubmitButton label="Kontrollera manuellt" pendingLabel="Kontrollerar..." />
+      <ScrapeProgressOverlay />
+      <SubmitButton label="Starta scrape" pendingLabel="Scrape körs..." />
     </form>
   );
 }

@@ -11,10 +11,40 @@ import {
   setPostStatus,
   tryAcquireLock,
   updatePostTranscript,
+  updatePostUrl,
   writeRunLog,
 } from "@/lib/data";
 import { getEnv } from "@/lib/env";
 import { getErrorMessage } from "@/lib/errors";
+import { extractTikTokVideoId } from "@/lib/tiktok";
+import type { DashboardPost } from "@/lib/types";
+
+function usableTikTokUrl(value: string | null | undefined) {
+  const trimmed = value?.trim();
+  return trimmed && /^https?:\/\/(www\.)?tiktok\.com\//i.test(trimmed) ? trimmed : null;
+}
+
+function resolveTikTokUrl(post: Pick<DashboardPost, "url" | "platform_post_id">) {
+  const currentUrl = usableTikTokUrl(post.url);
+  if (currentUrl) return { url: currentUrl, reconstructed: false };
+
+  const videoId = extractTikTokVideoId(post.url) || extractTikTokVideoId(post.platform_post_id);
+  if (!videoId) return { url: null, reconstructed: false };
+
+  const username = getEnv("TIKTOK_USERNAME") || "stockrobber";
+  return { url: `https://www.tiktok.com/@${username}/video/${videoId}`, reconstructed: true };
+}
+
+async function transcriptForPost(post: DashboardPost) {
+  const resolved = resolveTikTokUrl(post);
+  if (getEnv("APIFY_TRANSCRIPT_ACTOR_ID") && resolved.url) {
+    if (resolved.reconstructed && resolved.url !== post.url) await updatePostUrl(post.id, resolved.url);
+    return transcribeTikTokUrl(resolved.url);
+  }
+
+  if (post.media_url) return transcribeMediaUrl(post.media_url);
+  return null;
+}
 
 export async function analyzePost(postId: string, explainLevel: ExplainLevel = DEFAULT_EXPLAIN_LEVEL) {
   const post = await getPostWithAnalysis(postId);
@@ -38,14 +68,10 @@ export async function transcribePost(postId: string) {
 
   await setPostStatus(postId, "processing");
   try {
-    const transcript = getEnv("APIFY_TRANSCRIPT_ACTOR_ID")
-      ? await transcribeTikTokUrl(post.url)
-      : post.media_url
-        ? await transcribeMediaUrl(post.media_url)
-        : null;
+    const transcript = await transcriptForPost(post);
 
     if (!transcript) {
-      throw new Error("APIFY_TRANSCRIPT_ACTOR_ID saknas. Lägg in transcript-actorns id i Vercel för automatisk transkribering.");
+      throw new Error("Kunde inte hitta en TikTok-länk att transkribera. Lägg in URL manuellt eller scrapea om videon.");
     }
 
     const updated = await updatePostTranscript(postId, transcript);
@@ -67,14 +93,10 @@ export async function processPost(postId: string, explainLevel: ExplainLevel = D
     let transcribed = false;
 
     if (!transcript) {
-      transcript = getEnv("APIFY_TRANSCRIPT_ACTOR_ID")
-        ? await transcribeTikTokUrl(post.url)
-        : post.media_url
-          ? await transcribeMediaUrl(post.media_url)
-          : null;
+      transcript = await transcriptForPost(post);
 
       if (!transcript) {
-        throw new Error("APIFY_TRANSCRIPT_ACTOR_ID saknas. Lägg in transcript-actorns id i Vercel för automatisk transkribering.");
+        throw new Error("Kunde inte hitta en TikTok-länk att transkribera. Lägg in URL manuellt eller scrapea om videon.");
       }
 
       await updatePostTranscript(postId, transcript);
