@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { BarChart3, ClipboardList, Gauge, PlaySquare, Search, WalletCards } from "lucide-react";
+import { BarChart3, ClipboardList, Gauge, LineChart, PlaySquare, Search, WalletCards } from "lucide-react";
 
 const tabs = [
   { id: "overview", label: "Beslut", icon: Gauge },
@@ -7,6 +7,7 @@ const tabs = [
   { id: "manual", label: "Manuellt", icon: PlaySquare },
   { id: "scrape", label: "Scrape", icon: Search },
   { id: "outcomes", label: "Utfall", icon: BarChart3 },
+  { id: "stocks", label: "Aktier", icon: LineChart },
   { id: "paper", label: "Paper", icon: WalletCards },
 ];
 

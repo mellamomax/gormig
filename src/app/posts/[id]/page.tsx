@@ -6,9 +6,13 @@ import { RiskBadge, SignalBadge, StatusBadge } from "@/components/badges";
 import { OutcomeUpdateForm } from "@/components/outcomes";
 import { ReliabilityDots } from "@/components/reliability-dots";
 import { SubmitButton } from "@/components/submit-button";
+import { MentionStockTrace } from "@/components/stock-tracker";
 import { SummaryLevelSwitcher } from "@/components/summary-level-switcher";
 import { canUseDatabase, getPostWithAnalysis, listOutcomeEvaluations } from "@/lib/data";
 import { buildHorizonDecision, buildPositionSize, buildReliability } from "@/lib/decision";
+import { normalizeSymbol } from "@/lib/jobs/outcomes";
+import { fetchDailyPrices, hasMarketDataConfig, type DailyPrice } from "@/lib/market/alpha-vantage";
+import { priceMoveSince } from "@/lib/market/performance";
 import { getHeadline, getMentionedStockLabel, getSummaryMap } from "@/lib/summary";
 
 function formatDate(value: string | null) {
@@ -54,6 +58,10 @@ function positionTone(tone: ReturnType<typeof buildPositionSize>["tone"]) {
   return "bg-slate-200 text-slate-800";
 }
 
+function getErrorMessage(error: unknown) {
+  return error instanceof Error ? error.message : "Okänt fel";
+}
+
 export default async function PostPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams?: Promise<Record<string, string | string[] | undefined>> }) {
   if (!canUseDatabase()) notFound();
   const { id } = await params;
@@ -74,6 +82,26 @@ export default async function PostPage({ params, searchParams }: { params: Promi
   const outcomeErrors = (firstParam(rawParams.errors) || "").split(" | ").filter(Boolean);
   if (!post) notFound();
   const outcomes = (await listOutcomeEvaluations()).filter((outcome) => outcome.post_id === post.id);
+  const marketEnabled = hasMarketDataConfig();
+  const priceCache = new Map<string, DailyPrice[]>();
+  const priceErrors = new Map<string, string>();
+
+  if (marketEnabled) {
+    for (const mention of post.mentions || []) {
+      const ticker = mention.ticker?.trim();
+      if (!ticker) continue;
+
+      const symbol = normalizeSymbol(ticker, mention.exchange);
+      if (priceCache.has(symbol) || priceErrors.has(symbol)) continue;
+
+      try {
+        priceCache.set(symbol, await fetchDailyPrices(symbol, "full"));
+      } catch (error) {
+        priceErrors.set(symbol, getErrorMessage(error));
+      }
+    }
+  }
+
   const webUrl = usableWebUrl(post.url);
   const processLabel =
     post.processing_status === "failed"
@@ -161,6 +189,10 @@ export default async function PostPage({ params, searchParams }: { params: Promi
             const horizon = buildHorizonDecision(decisionInput);
             const position = buildPositionSize(decisionInput);
             const reliability = buildReliability(decisionInput);
+            const symbol = mention.ticker ? normalizeSymbol(mention.ticker, mention.exchange) : null;
+            const prices = symbol ? priceCache.get(symbol) || [] : [];
+            const marketError = symbol ? priceErrors.get(symbol) : undefined;
+            const publishedAt = post.published_at || post.created_at || null;
             return (
               <article key={mention.id} className="rounded border border-[var(--line)] bg-[var(--panel)] p-5">
                 <div className="flex flex-wrap items-center justify-between gap-3">
@@ -197,6 +229,17 @@ export default async function PostPage({ params, searchParams }: { params: Promi
                   <p className="font-semibold text-[var(--foreground)]">{horizon.detail}</p>
                   <p className="mt-1">{position.detail}</p>
                 </div>
+                {mention.ticker ? (
+                  <MentionStockTrace
+                    ticker={mention.ticker}
+                    companyName={mention.company_name}
+                    publishedAt={publishedAt}
+                    prices={prices}
+                    move={priceMoveSince(prices, publishedAt)}
+                    marketEnabled={marketEnabled}
+                    marketError={marketError}
+                  />
+                ) : null}
                 <p className="mt-4 text-sm leading-6 text-slate-700"><span className="font-semibold">Varför:</span> {mention.thesis}</p>
                 {signal ? <p className="mt-3 rounded bg-[var(--panel-2)] p-3 text-sm leading-6 text-slate-700">{signal.reasoning}</p> : null}
                 {outcome ? (

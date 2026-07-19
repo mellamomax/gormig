@@ -7,9 +7,13 @@ import { AccuracySummary, OutcomeList, OutcomeUpdateForm } from "@/components/ou
 import { PaperTradingPanel } from "@/components/paper-trading";
 import { PostList } from "@/components/post-list";
 import { ReliabilityDots } from "@/components/reliability-dots";
-import { canUseDatabase, getAccuracyOverview, getDashboardStats, getPaperTradingOverview, listDashboardPosts, listOutcomeEvaluations, listRecentFollowUpEvents } from "@/lib/data";
+import { StockTrackerPanel, type StockOption, type StockTraceRow } from "@/components/stock-tracker";
+import { canUseDatabase, getAccuracyOverview, getDashboardStats, getPaperTradingOverview, listDashboardPosts, listMentionedStockHistory, listOutcomeEvaluations, listRecentFollowUpEvents } from "@/lib/data";
 import { addDays, inferHorizonDays, toDateOnly } from "@/lib/market/horizon";
+import { fetchDailyPrices, hasMarketDataConfig, type DailyPrice } from "@/lib/market/alpha-vantage";
+import { priceMoveSince } from "@/lib/market/performance";
 import { buildHorizonDecision, buildPositionSize, buildReliability } from "@/lib/decision";
+import { normalizeSymbol } from "@/lib/jobs/outcomes";
 import { hasOpenAIConfig } from "@/lib/openai/client";
 import { defaultSummary, getHeadline, getSummaryMap } from "@/lib/summary";
 import type { DashboardPost, FollowUpEvent, Mention, OutcomeEvaluation, PaperTradingSettings, Signal } from "@/lib/types";
@@ -27,6 +31,8 @@ type ActionItem = {
   position: ReturnType<typeof buildPositionSize>;
   reliability: ReturnType<typeof buildReliability>;
 };
+
+type StockHistoryMention = Mention & { signals?: Signal[]; posts?: DashboardPost };
 
 function normalizeParams(input: Record<string, string | string[] | undefined>) {
   return Object.fromEntries(
@@ -150,6 +156,59 @@ function buildActionItems(posts: DashboardPost[], outcomes: OutcomeEvaluation[])
   }
 
   return items.sort((a, b) => a.priority - b.priority || Number(b.signal.confidence) - Number(a.signal.confidence));
+}
+
+function getErrorMessage(error: unknown) {
+  return error instanceof Error ? error.message : "Okänt fel";
+}
+
+function buildStockOptions(history: StockHistoryMention[]): StockOption[] {
+  const map = new Map<string, StockOption>();
+
+  for (const mention of history) {
+    const ticker = mention.ticker?.trim().toUpperCase();
+    if (!ticker) continue;
+
+    const current = map.get(ticker);
+    if (current) {
+      current.count += 1;
+      continue;
+    }
+
+    map.set(ticker, {
+      ticker,
+      label: mention.company_name || ticker,
+      exchange: mention.exchange,
+      count: 1,
+    });
+  }
+
+  return [...map.values()].sort((a, b) => b.count - a.count || a.ticker.localeCompare(b.ticker));
+}
+
+function buildStockRows(history: StockHistoryMention[], ticker: string, prices: DailyPrice[]): StockTraceRow[] {
+  return history
+    .filter((mention) => mention.ticker?.trim().toUpperCase() === ticker)
+    .map((mention) => {
+      const post = mention.posts;
+      const signal = mention.signals?.[0];
+      const publishedAt = post?.published_at || post?.created_at || null;
+
+      return {
+        id: mention.id,
+        postId: post?.id || null,
+        ticker,
+        companyName: mention.company_name,
+        caption: post?.caption || post?.url || mention.company_name,
+        publishedAt,
+        action: signal?.action || null,
+        risk: signal?.risk_level || null,
+        confidence: signal?.confidence ?? null,
+        thesis: mention.thesis,
+        ...priceMoveSince(prices, publishedAt),
+      };
+    })
+    .sort((a, b) => (b.publishedAt || "").localeCompare(a.publishedAt || ""));
 }
 
 function Stat({ label, value, tone }: { label: string; value: string | number; tone?: "good" | "bad" }) {
@@ -362,6 +421,11 @@ export default async function Home({ searchParams }: { searchParams?: Promise<Re
   let outcomes: Awaited<ReturnType<typeof listOutcomeEvaluations>> = [];
   let followUps: FollowUpEvent[] = [];
   let paper = paperFallback();
+  let stockHistory: StockHistoryMention[] = [];
+  let stockOptions: StockOption[] = [];
+  let selectedTicker = "";
+  let stockPrices: DailyPrice[] = [];
+  let stockMarketError = "";
 
   if (hasDb) {
     [posts, stats, accuracy, outcomes, paper, followUps] = await Promise.all([
@@ -372,9 +436,26 @@ export default async function Home({ searchParams }: { searchParams?: Promise<Re
       getPaperTradingOverview(),
       listRecentFollowUpEvents(8),
     ]);
+
+    if (activeTab === "stocks") {
+      stockHistory = await listMentionedStockHistory();
+      stockOptions = buildStockOptions(stockHistory);
+      const requestedTicker = params.ticker?.toUpperCase();
+      selectedTicker = stockOptions.some((option) => option.ticker === requestedTicker) ? requestedTicker : stockOptions[0]?.ticker || "";
+      const selectedOption = stockOptions.find((option) => option.ticker === selectedTicker);
+
+      if (selectedTicker && hasMarketDataConfig()) {
+        try {
+          stockPrices = await fetchDailyPrices(normalizeSymbol(selectedTicker, selectedOption?.exchange), "full");
+        } catch (error) {
+          stockMarketError = getErrorMessage(error);
+        }
+      }
+    }
   }
 
   const actionItems = buildActionItems(posts, outcomes);
+  const stockRows = buildStockRows(stockHistory, selectedTicker, stockPrices);
   return (
     <main className="app-shell min-h-screen bg-[var(--background)]">
       <header className="app-header border-b border-[var(--line)] bg-[var(--panel)]">
@@ -442,6 +523,17 @@ export default async function Home({ searchParams }: { searchParams?: Promise<Re
             <AccuracySummary stats={accuracy} />
             <OutcomeList outcomes={outcomes} />
           </section>
+        ) : null}
+
+        {activeTab === "stocks" ? (
+          <StockTrackerPanel
+            options={stockOptions}
+            selectedTicker={selectedTicker}
+            prices={stockPrices}
+            rows={stockRows}
+            marketEnabled={hasMarketDataConfig()}
+            marketError={stockMarketError}
+          />
         ) : null}
 
         {activeTab === "paper" ? <PaperTradingPanel overview={paper} /> : null}

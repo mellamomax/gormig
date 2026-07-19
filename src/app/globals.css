@@ -95,7 +95,7 @@ button:disabled {
     bottom: calc(0.65rem + env(safe-area-inset-bottom));
     z-index: 40;
     display: grid;
-    grid-template-columns: repeat(6, minmax(0, 1fr));
+    grid-template-columns: repeat(7, minmax(0, 1fr));
     gap: 0.25rem;
     border-radius: 1.1rem;
     padding: 0.45rem;
@@ -191,5 +191,53 @@ button:disabled {
   select,
   textarea {
     font-size: 16px;
+  }
+
+  .stock-tracker form {
+    width: 100%;
+  }
+
+  .stock-tracker select {
+    min-width: 0;
+    flex: 1;
+  }
+
+  .stock-row-head {
+    display: none;
+  }
+
+  .stock-row {
+    grid-template-columns: minmax(0, 1fr) auto !important;
+    gap: 0.35rem 0.75rem;
+    margin: 0.65rem;
+    border: 1px solid var(--line);
+    border-radius: 0.9rem;
+    background: white;
+  }
+
+  .stock-row > span:nth-child(1) {
+    order: 2;
+    font-size: 0.75rem;
+  }
+
+  .stock-row > span:nth-child(2) {
+    order: 3;
+    font-size: 0.75rem;
+  }
+
+  .stock-row > span:nth-child(3) {
+    order: 1;
+    grid-column: 1 / -1;
+  }
+
+  .stock-row > span:nth-child(4) {
+    order: 4;
+    justify-self: end;
+  }
+
+  .stock-row > span:nth-child(5) {
+    order: 5;
+    grid-column: 1 / -1;
+    font-size: 0.75rem;
   }
 }

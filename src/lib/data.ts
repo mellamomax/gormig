@@ -270,6 +270,19 @@ export async function listStockHistory(ticker: string) {
   return (data || []) as unknown as Array<Mention & { signals?: Signal[]; posts?: DashboardPost }>;
 }
 
+export async function listMentionedStockHistory() {
+  if (!canUseDatabase()) return [] as Array<Mention & { signals?: Signal[]; posts?: DashboardPost }>;
+
+  const { data, error } = await getSupabaseAdmin()
+    .from("mentions")
+    .select("*, signals(*), posts(*, creators(username, profile_url))")
+    .not("ticker", "is", null)
+    .order("created_at", { ascending: false });
+
+  if (error) throw new Error(error.message);
+  return (data || []) as unknown as Array<Mention & { signals?: Signal[]; posts?: DashboardPost }>;
+}
+
 export async function createManualTranscriptPost(input: {
   url: string;
   transcript: string;

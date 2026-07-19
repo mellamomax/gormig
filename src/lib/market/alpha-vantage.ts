@@ -33,12 +33,12 @@ export function hasMarketDataConfig() {
   return Boolean(getEnv("ALPHA_VANTAGE_API_KEY"));
 }
 
-export async function fetchDailyPrices(symbol: string) {
+export async function fetchDailyPrices(symbol: string, outputsize: "compact" | "full" = "compact") {
   const apikey = requireEnv("ALPHA_VANTAGE_API_KEY");
   const url = new URL("https://www.alphavantage.co/query");
   url.searchParams.set("function", "TIME_SERIES_DAILY");
   url.searchParams.set("symbol", symbol);
-  url.searchParams.set("outputsize", "compact");
+  url.searchParams.set("outputsize", outputsize);
   url.searchParams.set("apikey", apikey);
 
   const response = await fetch(url, { next: { revalidate: 60 * 60 * 12 } });
