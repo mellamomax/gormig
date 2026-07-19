@@ -53,6 +53,8 @@ function scrapeReportUrl(report: Awaited<ReturnType<typeof scrapeLatestPosts>>) 
     inserted: String(report.inserted),
     skipped: String(report.skipped),
     adopted: String(report.adopted),
+    ignored: String(report.ignored),
+    irrelevant: String(report.irrelevant),
     processed: String(report.processed),
     processFailed: String(report.processFailed),
   });
@@ -67,6 +69,11 @@ function scrapeReportUrl(report: Awaited<ReturnType<typeof scrapeLatestPosts>>) 
 
 function deleteReportUrl(deleted: number) {
   return `/?tab=videos&deleteStatus=1&deleted=${deleted}`;
+}
+
+function deleteErrorUrl(error: unknown) {
+  const message = encodeURIComponent(getErrorMessage(error).slice(0, 500));
+  return `/?tab=videos&deleteError=1&deleteMessage=${message}`;
 }
 
 export async function addManualTranscriptAction(formData: FormData) {
@@ -108,8 +115,16 @@ export async function transcribePostAction(formData: FormData) {
 
 export async function deletePostsAction(formData: FormData) {
   const postIds = formData.getAll("postId").filter((value): value is string => typeof value === "string");
-  const report = await deletePosts(postIds);
-  revalidatePath("/");
+  let report: Awaited<ReturnType<typeof deletePosts>>;
+
+  try {
+    report = await deletePosts(postIds);
+    revalidatePath("/");
+  } catch (error) {
+    console.error("Delete posts failed", { message: getErrorMessage(error) });
+    redirect(deleteErrorUrl(error));
+  }
+
   redirect(deleteReportUrl(report.deleted));
 }
 

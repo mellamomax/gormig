@@ -2,6 +2,7 @@ import { createHash } from "crypto";
 import { getSupabaseAdmin, hasSupabaseConfig } from "@/lib/supabase/server";
 import { EXPLAIN_LEVELS } from "@/lib/explain-level";
 import { addDays, inferHorizonDays, toDateOnly } from "@/lib/market/horizon";
+import { classifySourcePost } from "@/lib/relevance";
 import type { AnalysisResponse } from "@/lib/schemas";
 import { extractTikTokVideoId } from "@/lib/tiktok";
 import type { Creator, DashboardPost, Mention, OutcomeEvaluation, PaperTrade, PaperTradingSettings, Post, Signal, SourcePost } from "@/lib/types";
@@ -335,13 +336,61 @@ export async function createManualTranscriptPost(input: {
   return data as Post;
 }
 
+function ignoredPostsTableMissing(error: { message?: string } | null) {
+  return Boolean(error?.message?.includes("ignored_posts"));
+}
+
+async function listIgnoredPostIds(creatorId: string) {
+  const { data, error } = await getSupabaseAdmin()
+    .from("ignored_posts")
+    .select("platform_post_id")
+    .eq("creator_id", creatorId);
+
+  if (error) {
+    if (ignoredPostsTableMissing(error)) return new Set<string>();
+    throw new Error(error.message);
+  }
+
+  return new Set((data || []).map((row: { platform_post_id: string }) => row.platform_post_id));
+}
+
+async function upsertIgnoredSourcePosts(
+  posts: Array<{ creatorId: string; post: SourcePost; reason: string }>,
+  options: { requireTable: boolean },
+) {
+  if (posts.length === 0) return { ignored: 0 };
+
+  const { data, error } = await getSupabaseAdmin()
+    .from("ignored_posts")
+    .upsert(
+      posts.map(({ creatorId, post, reason }) => ({
+        creator_id: creatorId,
+        platform_post_id: post.platformPostId,
+        url: post.url || null,
+        caption: post.caption || null,
+        reason,
+        raw_metadata: post.rawMetadata,
+      })),
+      { onConflict: "creator_id,platform_post_id" },
+    )
+    .select("id");
+
+  if (error) {
+    if (ignoredPostsTableMissing(error) && !options.requireTable) return { ignored: 0 };
+    throw new Error("Ignore-listan saknar tabellen ignored_posts. Kör senaste Supabase-migrationen först.");
+  }
+
+  return { ignored: (data || []).length };
+}
+
 export async function saveSourcePosts(posts: SourcePost[]) {
   const creator = await ensureDefaultCreator();
   if (posts.length === 0) {
-    return { found: 0, inserted: 0, skipped: 0, adopted: 0, insertedPostIds: [] as string[], processPostIds: [] as string[] };
+    return { found: 0, inserted: 0, skipped: 0, adopted: 0, ignored: 0, irrelevant: 0, insertedPostIds: [] as string[], processPostIds: [] as string[] };
   }
 
   const supabase = getSupabaseAdmin();
+  const ignoredPostIds = await listIgnoredPostIds(creator.id);
   const { data: existing, error: existingError } = await supabase
     .from("posts")
     .select("id, platform_post_id, url, caption, published_at, cover_url, media_url, duration_seconds, processing_status, raw_metadata")
@@ -373,10 +422,26 @@ export async function saveSourcePosts(posts: SourcePost[]) {
   }
 
   const newPosts: SourcePost[] = [];
+  const autoIgnoredPosts: Array<{ creatorId: string; post: SourcePost; reason: string }> = [];
   let adopted = 0;
+  let ignored = 0;
+  let irrelevant = 0;
 
   for (const post of posts) {
     const tiktokVideoId = extractTikTokVideoId(post.url) || post.platformPostId;
+    if (ignoredPostIds.has(post.platformPostId) || ignoredPostIds.has(tiktokVideoId)) {
+      ignored += 1;
+      continue;
+    }
+
+    const relevance = classifySourcePost(post);
+    if (!relevance.shouldImport) {
+      ignored += 1;
+      irrelevant += 1;
+      autoIgnoredPosts.push({ creatorId: creator.id, post, reason: relevance.reason || "not_relevant" });
+      continue;
+    }
+
     const existingPost = existingByPlatformId.get(post.platformPostId) || existingByTikTokId.get(tiktokVideoId);
 
     if (!existingPost) {
@@ -412,12 +477,16 @@ export async function saveSourcePosts(posts: SourcePost[]) {
     }
   }
 
+  await upsertIgnoredSourcePosts(autoIgnoredPosts, { requireTable: false });
+
   if (newPosts.length === 0) {
     return {
       found: posts.length,
       inserted: 0,
-      skipped: posts.length - adopted,
+      skipped: posts.length - adopted - ignored,
       adopted,
+      ignored,
+      irrelevant,
       insertedPostIds: [] as string[],
       processPostIds: Array.from(processPostIds),
     };
@@ -448,8 +517,10 @@ export async function saveSourcePosts(posts: SourcePost[]) {
   return {
     found: posts.length,
     inserted: newPosts.length,
-    skipped: posts.length - newPosts.length - adopted,
+    skipped: posts.length - newPosts.length - adopted - ignored,
     adopted,
+    ignored,
+    irrelevant,
     insertedPostIds,
     processPostIds: Array.from(processPostIds),
   };
@@ -479,6 +550,30 @@ export async function setPostStatus(postId: string, status: Post["processing_sta
 export async function deletePosts(postIds: string[]) {
   const ids = Array.from(new Set(postIds.map((id) => id.trim()).filter(Boolean)));
   if (ids.length === 0) return { deleted: 0 };
+
+  const { data: postsToDelete, error: selectError } = await getSupabaseAdmin()
+    .from("posts")
+    .select("creator_id, platform_post_id, url, caption, raw_metadata")
+    .in("id", ids);
+  if (selectError) throw new Error(selectError.message);
+
+  await upsertIgnoredSourcePosts(
+    ((postsToDelete || []) as Array<Pick<Post, "creator_id" | "platform_post_id" | "url" | "caption" | "raw_metadata">>).flatMap((post) => {
+      const platformPostIds = new Set([post.platform_post_id, extractTikTokVideoId(post.url)].filter((id): id is string => Boolean(id)));
+      return Array.from(platformPostIds).map((platformPostId) => ({
+        creatorId: post.creator_id,
+        post: {
+          platform: "tiktok" as const,
+          platformPostId,
+          url: post.url,
+          caption: post.caption,
+          rawMetadata: post.raw_metadata,
+        },
+        reason: "manual_delete",
+      }));
+    }),
+    { requireTable: true },
+  );
 
   const { data, error } = await getSupabaseAdmin().from("posts").delete().in("id", ids).select("id");
   if (error) throw new Error(error.message);

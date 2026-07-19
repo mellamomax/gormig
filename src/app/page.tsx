@@ -299,13 +299,32 @@ function ScrapeResultPanel({ params }: { params: Record<string, string> }) {
   const processed = Number(params.processed || 0);
   const processFailed = Number(params.processFailed || 0);
   const processErrors = (params.processErrors || "").split(" | ").filter(Boolean);
+  const ignored = Number(params.ignored || 0);
+  const irrelevant = Number(params.irrelevant || 0);
 
   return (
     <section className={`rounded border p-4 text-sm leading-6 ${processFailed ? "border-amber-200 bg-amber-50 text-amber-950" : "border-emerald-200 bg-emerald-50 text-emerald-950"}`}>
       <p>
-        Scrape klar: hittade {params.found || "0"}, nya {params.inserted || "0"}, adopterade {params.adopted || "0"}, redan sparade {params.skipped || "0"}. Analyserade {processed}, misslyckade {processFailed}.
+        Scrape klar: hittade {params.found || "0"}, nya {params.inserted || "0"}, adopterade {params.adopted || "0"}, redan sparade {params.skipped || "0"}, ignorerade {ignored}. Analyserade {processed}, misslyckade {processFailed}.
       </p>
+      {irrelevant ? <p className="mt-2 font-medium">Stoppade {irrelevant} video innan transkribering eftersom den inte såg aktierelevant ut.</p> : null}
       {processErrors.length ? <p className="mt-2 font-medium">Felorsak: {processErrors.join(" / ")}</p> : null}
+    </section>
+  );
+}
+
+function DeleteResultPanel({ params }: { params: Record<string, string> }) {
+  return (
+    <section className="rounded border border-emerald-200 bg-emerald-50 p-4 text-sm leading-6 text-emerald-950">
+      Raderade {params.deleted || "0"} videos och lade deras TikTok-ID i ignore-listan.
+    </section>
+  );
+}
+
+function DeleteErrorPanel({ message }: { message: string }) {
+  return (
+    <section className="rounded border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-950">
+      Radering kunde inte köras. Fel: {message || "Okänt fel"}
     </section>
   );
 }
@@ -375,6 +394,8 @@ export default async function Home({ searchParams }: { searchParams?: Promise<Re
         {params.outcomeStatus ? <OutcomeResultPanel params={params} /> : null}
         {params.scrapeError ? <ScrapeErrorPanel message={params.scrapeMessage || "Okänt fel"} /> : null}
         {params.scrapeStatus ? <ScrapeResultPanel params={params} /> : null}
+        {params.deleteError ? <DeleteErrorPanel message={params.deleteMessage || "Okänt fel"} /> : null}
+        {params.deleteStatus ? <DeleteResultPanel params={params} /> : null}
         <DashboardTabs active={activeTab} />
 
         {activeTab === "overview" ? (
