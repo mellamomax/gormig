@@ -338,21 +338,34 @@ export async function createManualTranscriptPost(input: {
 export async function saveSourcePosts(posts: SourcePost[]) {
   const creator = await ensureDefaultCreator();
   if (posts.length === 0) {
-    return { found: 0, inserted: 0, skipped: 0, adopted: 0, insertedPostIds: [] as string[] };
+    return { found: 0, inserted: 0, skipped: 0, adopted: 0, insertedPostIds: [] as string[], processPostIds: [] as string[] };
   }
 
   const supabase = getSupabaseAdmin();
   const { data: existing, error: existingError } = await supabase
     .from("posts")
-    .select("id, platform_post_id, url, caption, published_at, cover_url, media_url, duration_seconds, raw_metadata")
+    .select("id, platform_post_id, url, caption, published_at, cover_url, media_url, duration_seconds, processing_status, raw_metadata")
     .eq("creator_id", creator.id);
 
   if (existingError) throw new Error(existingError.message);
   const existingRows = (existing || []) as Array<
-    Pick<Post, "id" | "platform_post_id" | "url" | "caption" | "published_at" | "cover_url" | "media_url" | "duration_seconds" | "raw_metadata">
+    Pick<
+      Post,
+      | "id"
+      | "platform_post_id"
+      | "url"
+      | "caption"
+      | "published_at"
+      | "cover_url"
+      | "media_url"
+      | "duration_seconds"
+      | "processing_status"
+      | "raw_metadata"
+    >
   >;
   const existingByPlatformId = new Map(existingRows.map((row) => [row.platform_post_id, row]));
   const existingByTikTokId = new Map<string, (typeof existingRows)[number]>();
+  const processPostIds = new Set<string>();
 
   for (const row of existingRows) {
     const tiktokVideoId = extractTikTokVideoId(row.url) || (!row.platform_post_id.startsWith("manual:") ? row.platform_post_id : null);
@@ -369,6 +382,10 @@ export async function saveSourcePosts(posts: SourcePost[]) {
     if (!existingPost) {
       newPosts.push(post);
       continue;
+    }
+
+    if (existingPost.processing_status !== "analyzed" && existingPost.processing_status !== "processing") {
+      processPostIds.add(existingPost.id);
     }
 
     if (existingPost.platform_post_id !== post.platformPostId) {
@@ -396,7 +413,14 @@ export async function saveSourcePosts(posts: SourcePost[]) {
   }
 
   if (newPosts.length === 0) {
-    return { found: posts.length, inserted: 0, skipped: posts.length - adopted, adopted, insertedPostIds: [] as string[] };
+    return {
+      found: posts.length,
+      inserted: 0,
+      skipped: posts.length - adopted,
+      adopted,
+      insertedPostIds: [] as string[],
+      processPostIds: Array.from(processPostIds),
+    };
   }
 
   const { data, error } = await supabase
@@ -418,12 +442,16 @@ export async function saveSourcePosts(posts: SourcePost[]) {
     .select("id");
 
   if (error) throw new Error(error.message);
+  const insertedPostIds = (data || []).map((row: { id: string }) => row.id);
+  insertedPostIds.forEach((id) => processPostIds.add(id));
+
   return {
     found: posts.length,
     inserted: newPosts.length,
     skipped: posts.length - newPosts.length - adopted,
     adopted,
-    insertedPostIds: (data || []).map((row: { id: string }) => row.id),
+    insertedPostIds,
+    processPostIds: Array.from(processPostIds),
   };
 }
 
@@ -446,6 +474,16 @@ export async function setPostStatus(postId: string, status: Post["processing_sta
     .eq("id", postId);
 
   if (error) throw new Error(error.message);
+}
+
+export async function deletePosts(postIds: string[]) {
+  const ids = Array.from(new Set(postIds.map((id) => id.trim()).filter(Boolean)));
+  if (ids.length === 0) return { deleted: 0 };
+
+  const { data, error } = await getSupabaseAdmin().from("posts").delete().in("id", ids).select("id");
+  if (error) throw new Error(error.message);
+
+  return { deleted: (data || []).length };
 }
 
 function analysisMetadata(analysis: AnalysisResponse) {

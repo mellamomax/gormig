@@ -112,7 +112,7 @@ export async function scrapeLatestPosts(limit: number) {
     const processErrors: string[] = [];
     let processed = 0;
 
-    for (const postId of result.insertedPostIds) {
+    for (const postId of result.processPostIds) {
       try {
         await processPost(postId);
         processed += 1;

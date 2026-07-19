@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { createManualTranscriptPost, setPaperTradingEnabled } from "@/lib/data";
+import { createManualTranscriptPost, deletePosts, setPaperTradingEnabled } from "@/lib/data";
 import { parseExplainLevel } from "@/lib/explain-level";
 import { getErrorMessage } from "@/lib/errors";
 import { analyzePost, processPost, scrapeLatestPosts, transcribePost } from "@/lib/jobs/manual-runs";
@@ -65,6 +65,10 @@ function scrapeReportUrl(report: Awaited<ReturnType<typeof scrapeLatestPosts>>) 
   return `/?${params}`;
 }
 
+function deleteReportUrl(deleted: number) {
+  return `/?tab=videos&deleteStatus=1&deleted=${deleted}`;
+}
+
 export async function addManualTranscriptAction(formData: FormData) {
   const transcript = getString(formData, "transcript");
   if (!transcript) throw new Error("Transkription saknas.");
@@ -100,6 +104,13 @@ export async function transcribePostAction(formData: FormData) {
   await transcribePost(postId);
   revalidatePath("/");
   revalidatePath(`/posts/${postId}`);
+}
+
+export async function deletePostsAction(formData: FormData) {
+  const postIds = formData.getAll("postId").filter((value): value is string => typeof value === "string");
+  const report = await deletePosts(postIds);
+  revalidatePath("/");
+  redirect(deleteReportUrl(report.deleted));
 }
 
 export async function processPostAction(formData: FormData) {
