@@ -446,7 +446,7 @@ export default async function Home({ searchParams }: { searchParams?: Promise<Re
 
       if (selectedTicker && hasMarketDataConfig()) {
         try {
-          stockPrices = await fetchDailyPrices(normalizeSymbol(selectedTicker, selectedOption?.exchange), "full");
+          stockPrices = await fetchDailyPrices(normalizeSymbol(selectedTicker, selectedOption?.exchange));
         } catch (error) {
           stockMarketError = getErrorMessage(error);
         }

@@ -33,7 +33,7 @@ export function hasMarketDataConfig() {
   return Boolean(getEnv("ALPHA_VANTAGE_API_KEY"));
 }
 
-export async function fetchDailyPrices(symbol: string, outputsize: "compact" | "full" = "compact") {
+async function requestDailyPrices(symbol: string, outputsize: "compact" | "full") {
   const apikey = requireEnv("ALPHA_VANTAGE_API_KEY");
   const url = new URL("https://www.alphavantage.co/query");
   url.searchParams.set("function", "TIME_SERIES_DAILY");
@@ -44,6 +44,21 @@ export async function fetchDailyPrices(symbol: string, outputsize: "compact" | "
   const response = await fetch(url, { next: { revalidate: 60 * 60 * 12 } });
   if (!response.ok) throw new Error(`Alpha Vantage failed with ${response.status}`);
   return parseTimeSeries(await response.json());
+}
+
+function isPremiumOutputSizeError(error: unknown) {
+  return error instanceof Error && error.message.toLowerCase().includes("outputsize=full") && error.message.toLowerCase().includes("premium");
+}
+
+export async function fetchDailyPrices(symbol: string, outputsize: "compact" | "full" = "compact") {
+  try {
+    return await requestDailyPrices(symbol, outputsize);
+  } catch (error) {
+    if (outputsize === "full" && isPremiumOutputSizeError(error)) {
+      return requestDailyPrices(symbol, "compact");
+    }
+    throw error;
+  }
 }
 
 export function findPriceOnOrAfter(prices: DailyPrice[], date: string) {

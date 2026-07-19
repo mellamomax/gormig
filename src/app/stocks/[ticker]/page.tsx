@@ -48,7 +48,7 @@ export default async function StockPage({ params }: { params: Promise<{ ticker: 
 
   if (hasMarketDataConfig() && displayTicker) {
     try {
-      prices = await fetchDailyPrices(normalizeSymbol(displayTicker, exchange), "full");
+      prices = await fetchDailyPrices(normalizeSymbol(displayTicker, exchange));
     } catch (error) {
       marketError = getErrorMessage(error);
     }

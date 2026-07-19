@@ -95,7 +95,7 @@ export default async function PostPage({ params, searchParams }: { params: Promi
       if (priceCache.has(symbol) || priceErrors.has(symbol)) continue;
 
       try {
-        priceCache.set(symbol, await fetchDailyPrices(symbol, "full"));
+        priceCache.set(symbol, await fetchDailyPrices(symbol));
       } catch (error) {
         priceErrors.set(symbol, getErrorMessage(error));
       }
